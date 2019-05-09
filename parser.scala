@@ -44,8 +44,15 @@ object FWSParser extends JavaTokenParsers {
       case s if (!(reservedWord.contains(s))) => s
     }
 
-  def valueLabel :Parser[String] = ident
-  def typeLabel : Parser[String] = ident
+  def valueLabel :Parser[String] =
+    ident ^? {
+      case s if (!(reservedWord.contains(s)) && s.head.isLower) => s
+    }
+
+  def typeLabel : Parser[String] =
+    ident ^? {
+      case s if (!(reservedWord.contains(s)) && s.head.isUpper) => s
+    }
 
   def expr : Parser[Ast] =
     ( "val" ~> ((variable <~ "=") <~ "new") ~ (typ <~ ";") ~ expr ^^ {
