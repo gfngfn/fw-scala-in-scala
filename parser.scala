@@ -3,7 +3,13 @@ import scala.util.parsing.combinator._
 
 object FWSParser extends JavaTokenParsers {
 
-  def variable : Parser[String] = ident
+  val reservedWord = List("val", "def", "new", "type", "trait")
+
+  def variable : Parser[String] =
+    ident ^? {
+      case s if (!(reservedWord.contains(s))) => s
+    }
+
   def valueLabel :Parser[String] = ident
   def typeLabel : Parser[String] = ident
 
