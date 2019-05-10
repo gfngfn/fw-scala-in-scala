@@ -30,6 +30,10 @@ case class TypeSignature(tysig : Intersection)  extends Type
 
 sealed abstract class Value
 case class ValVar(x : String) extends Value
+  /* --
+     All the values (i.e. objects) are stored in the evaluation environment,
+     and thus we can handle every value in the form of a variable name.
+     -- */
 
 
 sealed abstract class ValueDeclBody
