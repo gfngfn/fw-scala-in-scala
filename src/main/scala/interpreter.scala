@@ -124,9 +124,25 @@ class FWSInterpreter {
 
 
   val substitute : (Value, String, Ast) => Ast =
-    (varg, x, astMain) => {
-      astMain // TEMPORARY; should implement the substitution of variable occurences
+    (value, x, ast) => {
+      val iter = substitute(value, x, _);
+      ast match {
+        case ValNewIn(y, ty, ast0) =>
+          if (y == x) { ast } else {
+            ValNewIn(y, ty, iter(ast0))
+          }
+
+        case Var(y) =>
+          if (y == x) { Var(x) } else { ast }
+
+        case Access(ast0, vlabel) =>
+          Access(iter(ast0), vlabel)
+
+        case Call(ast0, vlabel, astargs) =>
+          Call(iter(ast0), vlabel, astargs.map(iter))
+      }
     }
+
 
   def lookupDeclarations(env : Env, ty : Type, x : String) : Either[EvalError, List[Declaration]] =
     Right(Nil)  // TEMPORARY
