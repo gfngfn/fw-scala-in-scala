@@ -28,6 +28,10 @@ case class SingletonType(sty : Path)            extends Type
 case class TypeSignature(tysig : Intersection)  extends Type
 
 
+sealed abstract class Value
+case class ValVar(x : String) extends Value
+
+
 sealed abstract class Declaration
 case class DeclVal(vl : String, ty : Type, eopt : Option[Ast]) extends Declaration
 case class DeclDef(vl : String, params : List[(String, Type)], tyans : Type, eopt : Option[Ast]) extends Declaration
