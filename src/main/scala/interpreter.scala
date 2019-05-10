@@ -21,12 +21,9 @@ trait Env {
   }
 
 
-  def findDeclVal(x : String, vlabel : String) : Option[(Type, Option[Ast])] =
+  def findValueDecl(x : String, vlabel : String) : Option[ValueDeclBody] =
     body.get(x) flatMap { case (valmap, _) =>
-      valmap.get(vlabel) flatMap {
-        case DeclVal(ty, astopt) => Some((ty, astopt))
-        case DeclDef(_, _, _)    => None
-      }
+      valmap.get(vlabel)
     }
 
 }
@@ -37,10 +34,13 @@ class EmptyEnv extends Env {
 
 
 sealed trait EvalError
-case class NotImplementedYet(msg : String)       extends EvalError
-case class ValueLabelNotFound(vl : String)       extends EvalError
-case class ValueLabelNotImplemented(vl : String) extends EvalError
-
+case class NotImplementedYet(msg : String)            extends EvalError
+case class ValueLabelNotFound(vl : String)            extends EvalError
+case class FieldNotEmbodied(vl : String)              extends EvalError
+case class MethodNotImplemented(vl : String)          extends EvalError
+case class NotAFieldButAMethod(vl : String)           extends EvalError
+case class NotAMethodButAField(vl : String)           extends EvalError
+case class WrongNumberOfArguments(le : Int, la : Int) extends EvalError
 
 class FWSInterpreter {
 
@@ -48,6 +48,7 @@ class FWSInterpreter {
     val env = new EmptyEnv;
     interpret(env, ast)
   }
+
 
   def interpret(env : Env, ast : Ast) : Either[EvalError, Value] =
     ast match {
@@ -60,17 +61,55 @@ class FWSInterpreter {
         Right(ValVar(x))
 
       case Access(ast0, vlabel) =>
-        interpret(env, ast0) flatMap {
-          case ValVar(x) =>
-            env.findDeclVal(x, vlabel) match {
-              case None                     => Left(ValueLabelNotFound(vlabel))
-              case Some((_, None))          => Left(ValueLabelNotImplemented(vlabel))
-              case Some((ty, Some(astNew))) => interpret(env, astNew)
-            }
+        interpret(env, ast0) flatMap { case ValVar(x) =>
+          env.findValueDecl(x, vlabel) match {
+            case None                            => Left(ValueLabelNotFound(vlabel))
+            case Some(DeclDef(_, _, _))          => Left(NotAFieldButAMethod(vlabel))
+            case Some(DeclVal(_, None))          => Left(FieldNotEmbodied(vlabel))
+            case Some(DeclVal(ty, Some(astNew))) => interpret(env, astNew)
+          }
         }
 
       case Call(ast0, vlabel, astargs) =>
+        interpret(env, ast0) flatMap { case ValVar(x) =>
+          (env.findValueDecl(x, vlabel) match {
+            case None                                    => Left(ValueLabelNotFound(vlabel))
+            case Some(DeclVal(_, _))                     => Left(NotAFieldButAMethod(vlabel))
+            case Some(DeclDef(_, _, None))               => Left(MethodNotImplemented(vlabel))
+            case Some(DeclDef(params, ty, Some(astImp))) => Right((params, ty, astImp))
+          }) flatMap { case (params, ty, astImp) =>
+            substituteParams(astargs, params, astImp) flatMap { case astNew =>
+              interpret(env, astNew)
+            }
+          }
+        }
+/*
         Left(NotImplementedYet("evaluation for method calls"))  // TEMPORARY
+*/
+    }
+
+
+  val substituteParams : (List[Ast], List[(String, Type)], Ast) => Either[EvalError, Ast] =
+    (astargs, params, astImp) => {
+      val lenActual = astargs.length;
+      val lenExpected = params.length;
+      if (lenActual != lenExpected) {
+        Left(WrongNumberOfArguments(lenExpected, lenActual))
+      } else {
+        val lst : List[(Ast, (String, Type))] = astargs.zip(params);
+        val astImpNew : Ast = {
+          lst.foldLeft(astImp){ case (astImp, (astarg, (x, _))) =>
+            substitute(astarg, x, astImp)
+          }
+        };
+        Right(astImpNew)
+      }
+    }
+
+
+  val substitute : (Ast, String, Ast) => Ast =
+    (astarg, x, astMain) => {
+      astMain // TEMPORARY; should implement the substitution of variable occurences
     }
 
   def lookupDeclarations(env : Env, ty : Type, x : String) : Either[EvalError, List[Declaration]] =
