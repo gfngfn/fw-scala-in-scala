@@ -44,9 +44,15 @@ case class WrongNumberOfArguments(le : Int, la : Int) extends EvalError
 
 class FWSInterpreter {
 
-  def run(ast : Ast) = {
+  def run(ast : Ast) : Unit = {
     val env = new EmptyEnv;
-    interpret(env, ast)
+    interpret(env, ast) match {
+      case Right(v) =>
+        println("returned value: " + v)
+
+      case Left(e) =>
+        println("error: " + e)
+    }
   }
 
 
