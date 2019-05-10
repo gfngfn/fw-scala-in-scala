@@ -21,8 +21,17 @@ trait Env {
   }
 
 
-  def findDeclVar(vlabel : String) : Option[(Type, Option[Ast])] =
-    None  // TEMPORARY
+  def findDeclVal(x : String, vlabel : String) : Option[(Type, Option[Ast])] =
+    body.get(x) match {
+      case None =>
+        None
+
+      case Some((valmap, _)) =>
+        valmap.get(vlabel) match {
+          case Some(DeclVal(ty, astopt)) => Some((ty, astopt))
+          case _                         => None
+        }
+    }
 
 }
 
@@ -60,7 +69,7 @@ class FWSInterpreter {
             res0
 
           case Right(ValVar(x)) =>
-            env.findDeclVar(vlabel) match {
+            env.findDeclVal(x, vlabel) match {
               case None                     => Left(ValueLabelNotFound(vlabel))
               case Some((_, None))          => Left(ValueLabelNotImplemented(vlabel))
               case Some((ty, Some(astNew))) => interpret(env, astNew)
