@@ -36,7 +36,7 @@ class EmptyEnv extends Env {
 }
 
 
-sealed abstract class EvalError
+sealed trait EvalError
 case class NotImplementedYet(msg : String)       extends EvalError
 case class ValueLabelNotFound(vl : String)       extends EvalError
 case class ValueLabelNotImplemented(vl : String) extends EvalError

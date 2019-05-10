@@ -1,7 +1,7 @@
 import scala.util.parsing.combinator._
 
 
-sealed abstract class Ast
+sealed trait Ast
 case class ValNewIn(x : String, ty : Type, e : Ast)   extends Ast
 case class Var(x : String)                            extends Ast
 case class Access(e : Ast, vl : String)               extends Ast
@@ -22,13 +22,13 @@ object Intersection {
 }
 
 
-sealed abstract class Type
+sealed trait Type
 case class TypeSelection(p : Path, tl : String) extends Type
 case class SingletonType(sty : Path)            extends Type
 case class TypeSignature(tysig : Intersection)  extends Type
 
 
-sealed abstract class Value
+sealed trait Value
 case class ValVar(x : String) extends Value
   /* --
      All the values (i.e. objects) are stored in the evaluation environment,
@@ -36,17 +36,17 @@ case class ValVar(x : String) extends Value
      -- */
 
 
-sealed abstract class ValueDeclBody
+sealed trait ValueDeclBody
 case class DeclVal(ty : Type, eopt : Option[Ast])                                   extends ValueDeclBody
 case class DeclDef(params : List[(String, Type)], tyans : Type, eopt : Option[Ast]) extends ValueDeclBody
 
 
-sealed abstract class TypeDeclBody
+sealed trait TypeDeclBody
 case class DeclType(tyopt : Option[Type])  extends TypeDeclBody
 case class DeclTrait(tysig : Intersection) extends TypeDeclBody
 
 
-sealed abstract class Declaration
+sealed trait Declaration
 case class DeclForValueLabel(vl : String, vd : ValueDeclBody) extends Declaration
 case class DeclForTypeLabel(tl : String, td : TypeDeclBody)   extends Declaration
 
