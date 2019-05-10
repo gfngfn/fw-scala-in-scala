@@ -1,22 +1,34 @@
 
-class Env(_body : Map[String, List[Declaration]]) {
 
-  val body : Map[String, List[Declaration]] = _body
+trait Env {
 
+  type ValueMap = Map[String, ValueDeclBody]
+  type TypeMap  = Map[String, TypeDeclBody]
 
-  def +(x : String, decls : List[Declaration]) =
-    new Env(this.body + ((x, decls)))
+  val body : Map[String, (ValueMap, TypeMap)]
+
+  def +(x : String, decls : List[Declaration]) = {
+    val mapPair : (ValueMap, TypeMap) = {
+      val init : (ValueMap, TypeMap) = (Map(), Map());
+      decls.foldLeft(init){ case ((valmap, tymap), decl) =>
+        decl match {
+          case DeclForValueLabel(vl, vd) => (valmap + ((vl, vd)), tymap)
+          case DeclForTypeLabel(tl, td)  => (valmap, tymap + ((tl, td)))
+        }
+      }
+    };
+    new Env { val body = Env.this.body + ((x, mapPair)) }
+  }
 
 
   def findDeclVar(vlabel : String) : Option[(Type, Option[Ast])] =
     None  // TEMPORARY
 
 }
-/*
-object Env {
-  def apply : Env = new Env(Map())
+
+class EmptyEnv extends Env {
+  val body : Map[String, (ValueMap, TypeMap)] = Map()
 }
-*/
 
 
 sealed abstract class EvalError
@@ -28,7 +40,7 @@ case class ValueLabelNotImplemented(vl : String) extends EvalError
 class FWSInterpreter {
 
   def run(ast : Ast) = {
-    val env = new Env(Map());
+    val env = new EmptyEnv;
     interpret(env, ast)
   }
 

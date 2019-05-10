@@ -32,11 +32,19 @@ sealed abstract class Value
 case class ValVar(x : String) extends Value
 
 
+sealed abstract class ValueDeclBody
+case class DeclVal(ty : Type, eopt : Option[Ast])                                   extends ValueDeclBody
+case class DeclDef(params : List[(String, Type)], tyans : Type, eopt : Option[Ast]) extends ValueDeclBody
+
+
+sealed abstract class TypeDeclBody
+case class DeclType(tyopt : Option[Type])  extends TypeDeclBody
+case class DeclTrait(tysig : Intersection) extends TypeDeclBody
+
+
 sealed abstract class Declaration
-case class DeclVal(vl : String, ty : Type, eopt : Option[Ast]) extends Declaration
-case class DeclDef(vl : String, params : List[(String, Type)], tyans : Type, eopt : Option[Ast]) extends Declaration
-case class DeclType(tl : String, tyopt : Option[Type]) extends Declaration
-case class DeclTrait(tl : String, tysig : Intersection) extends Declaration
+case class DeclForValueLabel(vl : String, vd : ValueDeclBody) extends Declaration
+case class DeclForTypeLabel(tl : String, td : TypeDeclBody)   extends Declaration
 
 
 object FWSParser extends JavaTokenParsers {
@@ -111,16 +119,16 @@ object FWSParser extends JavaTokenParsers {
 
   def decl : Parser[Declaration] =
     ( "val" ~> (valueLabel <~ ":") ~ typ ~ opt("=" ~> expr) ^^ {
-        case vl ~ ty ~ eopt => DeclVal(vl, ty, eopt)
+        case vl ~ ty ~ eopt => DeclForValueLabel(vl, DeclVal(ty, eopt))
       }
     | "def" ~> valueLabel ~ (params <~ ":") ~ typ ~ opt("=" ~> expr) ^^ {
-        case vl ~ pars ~ ty ~ eopt => DeclDef(vl, pars, ty, eopt)
+        case vl ~ pars ~ ty ~ eopt => DeclForValueLabel(vl, DeclDef(pars, ty, eopt))
       }
     | "type" ~> typeLabel ~ opt("=" ~> typ) ^^ {
-        case tl ~ tyopt => DeclType(tl, tyopt)
+        case tl ~ tyopt => DeclForTypeLabel(tl, DeclType(tyopt))
       }
     | "trait" ~> typeLabel ~ typeSignature ^^ {
-        case tl ~ tysig => DeclTrait(tl, tysig)
+        case tl ~ tysig => DeclForTypeLabel(tl, DeclTrait(tysig))
       }
     )
 
