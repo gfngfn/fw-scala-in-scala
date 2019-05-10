@@ -78,8 +78,18 @@ class FWSInterpreter {
             case Some(DeclDef(_, _, None))               => Left(MethodNotImplemented(vlabel))
             case Some(DeclDef(params, ty, Some(astImp))) => Right((params, ty, astImp))
           }) flatMap { case (params, ty, astImp) =>
-            substituteParams(astargs, params, astImp) flatMap { case astNew =>
-              interpret(env, astNew)
+            val resInit : Either[EvalError, List[Value]] = Right(Nil);
+            astargs.foldLeft(resInit){ case (res, astarg) =>
+              res flatMap { case vacc =>
+                interpret(env, astarg) flatMap { case varg =>
+                  Right(varg :: vacc)
+                }
+              }
+            } flatMap { case vargsrev : List[Value] =>
+              val vargs = vargsrev.reverse;
+              substituteParams(vargs, params, astImp) flatMap { case astNew =>
+                interpret(env, astNew)
+              }
             }
           }
         }
@@ -89,17 +99,17 @@ class FWSInterpreter {
     }
 
 
-  val substituteParams : (List[Ast], List[(String, Type)], Ast) => Either[EvalError, Ast] =
-    (astargs, params, astImp) => {
-      val lenActual = astargs.length;
+  val substituteParams : (List[Value], List[(String, Type)], Ast) => Either[EvalError, Ast] =
+    (vargs, params, astImp) => {
+      val lenActual = vargs.length;
       val lenExpected = params.length;
       if (lenActual != lenExpected) {
         Left(WrongNumberOfArguments(lenExpected, lenActual))
       } else {
-        val lst : List[(Ast, (String, Type))] = astargs.zip(params);
+        val lst : List[(Value, (String, Type))] = vargs.zip(params);
         val astImpNew : Ast = {
-          lst.foldLeft(astImp){ case (astImp, (astarg, (x, _))) =>
-            substitute(astarg, x, astImp)
+          lst.foldLeft(astImp){ case (astImp, (varg, (x, _))) =>
+            substitute(varg, x, astImp)
           }
         };
         Right(astImpNew)
@@ -107,8 +117,8 @@ class FWSInterpreter {
     }
 
 
-  val substitute : (Ast, String, Ast) => Ast =
-    (astarg, x, astMain) => {
+  val substitute : (Value, String, Ast) => Ast =
+    (varg, x, astMain) => {
       astMain // TEMPORARY; should implement the substitution of variable occurences
     }
 
