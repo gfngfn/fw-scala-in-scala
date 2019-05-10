@@ -44,7 +44,7 @@ object FWSParser extends JavaTokenParsers {
       case s if (!(reservedWord.contains(s))) => s
     }
 
-  def valueLabel :Parser[String] =
+  def valueLabel : Parser[String] =
     ident ^? {
       case s if (!(reservedWord.contains(s)) && s.head.isLower) => s
     }
