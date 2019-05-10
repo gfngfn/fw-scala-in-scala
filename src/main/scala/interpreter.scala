@@ -22,15 +22,11 @@ trait Env {
 
 
   def findDeclVal(x : String, vlabel : String) : Option[(Type, Option[Ast])] =
-    body.get(x) match {
-      case None =>
-        None
-
-      case Some((valmap, _)) =>
-        valmap.get(vlabel) match {
-          case Some(DeclVal(ty, astopt)) => Some((ty, astopt))
-          case _                         => None
-        }
+    body.get(x) flatMap { case (valmap, _) =>
+      valmap.get(vlabel) flatMap {
+        case DeclVal(ty, astopt) => Some((ty, astopt))
+        case DeclDef(_, _, _)    => None
+      }
     }
 
 }
@@ -56,19 +52,16 @@ class FWSInterpreter {
   def interpret(env : Env, ast : Ast) : Either[EvalError, Value] =
     ast match {
       case ValNewIn(x, ty, ast0) =>
-        val decls = lookupDeclarations(env, ty, x);
-        interpret(env + (x, decls), ast0)
+        lookupDeclarations(env, ty, x) flatMap { case decls =>
+          interpret(env + (x, decls), ast0)
+        }
 
       case Var(x) =>
         Right(ValVar(x))
 
       case Access(ast0, vlabel) =>
-        val res0 = interpret(env, ast0);
-        res0 match {
-          case Left(_) =>
-            res0
-
-          case Right(ValVar(x)) =>
+        interpret(env, ast0) flatMap {
+          case ValVar(x) =>
             env.findDeclVal(x, vlabel) match {
               case None                     => Left(ValueLabelNotFound(vlabel))
               case Some((_, None))          => Left(ValueLabelNotImplemented(vlabel))
@@ -80,6 +73,6 @@ class FWSInterpreter {
         Left(NotImplementedYet("evaluation for method calls"))  // TEMPORARY
     }
 
-  def lookupDeclarations(env : Env, ty : Type, x : String) =
-    Nil  // TEMPORARY
+  def lookupDeclarations(env : Env, ty : Type, x : String) : Either[EvalError, List[Declaration]] =
+    Right(Nil)  // TEMPORARY
 }
