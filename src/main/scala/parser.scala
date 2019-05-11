@@ -9,18 +9,9 @@ case class Call(e : Ast, vl : String, es : List[Ast]) extends Ast
 
 
 case class Path(x : String, vls : List[String])
-/*
-object Path {
-  def apply(x : String, vls : List[String]) =
-    new Path(x, vls)
-}
-*/
 
-class Intersection(tys : List[Type], x : String, decls : List[Declaration])
-object Intersection {
-  def apply(tys : List[Type], x : String, decls : List[Declaration]) =
-    new Intersection(tys, x, decls)
-}
+
+case class Intersection(tys : List[Type], x : String, decls : List[Declaration])
 
 
 sealed trait Type
