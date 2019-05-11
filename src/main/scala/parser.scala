@@ -109,13 +109,19 @@ object FWSParser extends JavaTokenParsers {
       }
     )
 
+  def typs : Parser[List[Type]] =
+    "(" ~> (opt(rep1sep(typ, ",")) <~ ")") ^^ {
+      case None      => Nil
+      case Some(tys) => tys
+    }
+
   def singletonType : Parser[Type] =
     path <~ ".type" ^^ {
       case p => SingletonType(p)
     }
 
   def typeSignature : Parser[Intersection[Type]] =
-    "(" ~> ((rep1sep(typ, ",") <~ ")") <~ "{") ~ (variable <~ "|") ~ (rep(decl) <~ "}") ^^ {
+    (typs <~ "{") ~ (variable <~ "|") ~ (rep(decl) <~ "}") ^^ {
       case tys ~ x ~ decls => Intersection(tys, x, decls)
     }
 
