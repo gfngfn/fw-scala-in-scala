@@ -8,12 +8,13 @@ case class Access(e : Ast, vl : String)               extends Ast
 case class Call(e : Ast, vl : String, es : List[Ast]) extends Ast
 
 
-class Path(x : String, vls : List[String])
+case class Path(x : String, vls : List[String])
+/*
 object Path {
   def apply(x : String, vls : List[String]) =
     new Path(x, vls)
 }
-
+*/
 
 class Intersection(tys : List[Type], x : String, decls : List[Declaration])
 object Intersection {

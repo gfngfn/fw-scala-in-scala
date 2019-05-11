@@ -26,6 +26,12 @@ trait Env {
       valmap.get(vlabel)
     }
 
+
+  def findTypeDecl(x : String, tlabel : String) : Option[TypeDeclBody] =
+    body.get(x) flatMap { case (_, tymap) =>
+      tymap.get(tlabel)
+    }
+
 }
 
 class EmptyEnv extends Env {
@@ -36,8 +42,10 @@ class EmptyEnv extends Env {
 sealed trait EvalError
 case class NotImplementedYet(msg : String)            extends EvalError
 case class ValueLabelNotFound(vl : String)            extends EvalError
+case class TypeLabelNotFound(tl : String)             extends EvalError
 case class FieldNotEmbodied(vl : String)              extends EvalError
 case class MethodNotImplemented(vl : String)          extends EvalError
+case class TypeNotEmbodied(tl : String)               extends EvalError
 case class NotAFieldButAMethod(vl : String)           extends EvalError
 case class NotAMethodButAField(vl : String)           extends EvalError
 case class WrongNumberOfArguments(le : Int, la : Int) extends EvalError
@@ -145,5 +153,21 @@ class FWSInterpreter {
 
 
   def lookupDeclarations(env : Env, ty : Type, x : String) : Either[EvalError, List[Declaration]] =
-    Right(Nil)  // TEMPORARY
+    // FIXME; should apply to "type values", not to types
+    ty match {
+      case TypeSelection(Path(x, _), tlabel) =>
+        env.findTypeDecl(x, tlabel) match {
+          case None                      => Left(TypeLabelNotFound(tlabel))
+          case Some(DeclType(None))      => Left(TypeNotEmbodied(tlabel))
+          case Some(DeclType(Some(ty0))) => lookupDeclarations(env, ty0, x)
+          case Some(DeclTrait(tysig))    => lookupDeclarations(env, TypeSignature(tysig), x)
+        }
+
+      case TypeSignature(tysig) =>
+        Right(Nil)  // TEMPORARY
+
+      case SingletonType(p) =>
+        Right(Nil)  // TEMPORARY
+
+    }
 }
