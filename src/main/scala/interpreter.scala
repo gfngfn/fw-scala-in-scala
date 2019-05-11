@@ -54,7 +54,7 @@ class FWSInterpreter {
 
   def run(ast : Ast) : Unit = {
     val env = new EmptyEnv;
-    interpret(env, ast) match {
+    interpretAst(env, ast) match {
       case Right(v) =>
         println("returned value: " + v)
 
@@ -64,28 +64,28 @@ class FWSInterpreter {
   }
 
 
-  def interpret(env : Env, ast : Ast) : Either[EvalError, Value] =
+  def interpretAst(env : Env, ast : Ast) : Either[EvalError, Value] =
     ast match {
       case ValNewIn(x, ty, ast0) =>
         lookupDeclarations(env, ty, x) flatMap { case decls =>
-          interpret(env + (x, decls), ast0)
+          interpretAst(env + (x, decls), ast0)
         }
 
       case Var(x) =>
         Right(ValVar(x))
 
       case Access(ast0, vlabel) =>
-        interpret(env, ast0) flatMap { case ValVar(x) =>
+        interpretAst(env, ast0) flatMap { case ValVar(x) =>
           env.findValueDecl(x, vlabel) match {
             case None                            => Left(ValueLabelNotFound(vlabel))
             case Some(DeclDef(_, _, _))          => Left(NotAFieldButAMethod(vlabel))
             case Some(DeclVal(_, None))          => Left(FieldNotEmbodied(vlabel))
-            case Some(DeclVal(ty, Some(astNew))) => interpret(env, astNew)
+            case Some(DeclVal(ty, Some(astNew))) => interpretAst(env, astNew)
           }
         }
 
       case Call(ast0, vlabel, astargs) =>
-        interpret(env, ast0) flatMap { case ValVar(x) =>
+        interpretAst(env, ast0) flatMap { case ValVar(x) =>
           (env.findValueDecl(x, vlabel) match {
             case None                                    => Left(ValueLabelNotFound(vlabel))
             case Some(DeclVal(_, _))                     => Left(NotAFieldButAMethod(vlabel))
@@ -95,14 +95,14 @@ class FWSInterpreter {
             val resInit : Either[EvalError, List[Value]] = Right(Nil);
             astargs.foldLeft(resInit){ case (res, astarg) =>
               res flatMap { case vacc =>
-                interpret(env, astarg) flatMap { case varg =>
+                interpretAst(env, astarg) flatMap { case varg =>
                   Right(varg :: vacc)
                 }
               }
             } flatMap { case vargsrev : List[Value] =>
               val vargs = vargsrev.reverse;
               substituteParams(vargs, params, astImp) flatMap { case astNew =>
-                interpret(env, astNew)
+                interpretAst(env, astNew)
               }
             }
           }
