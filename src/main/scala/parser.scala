@@ -29,7 +29,7 @@ case class ValVar(x : String) extends Value
 
 
 sealed trait TypeValue
-case class ValTypeSelection(x : Var, tl : String)            extends TypeValue
+case class ValTypeSelection(x : String, tl : String)         extends TypeValue
 case class ValSingletonType(p : Path)                        extends TypeValue
 case class ValTypeSignature(tysig : Intersection[TypeValue]) extends TypeValue
 

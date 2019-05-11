@@ -67,8 +67,10 @@ class FWSInterpreter {
   def interpretAst(env : Env, ast : Ast) : Either[EvalError, Value] =
     ast match {
       case ValNewIn(x, ty, ast0) =>
-        lookupDeclarations(env, ty, x) flatMap { case decls =>
-          interpretAst(env + (x, decls), ast0)
+        interpretType(env, ty) flatMap { tyval =>
+          lookupDeclarations(env, tyval, x) flatMap { decls =>
+            interpretAst(env + (x, decls), ast0)
+          }
         }
 
       case Var(x) =>
@@ -107,9 +109,50 @@ class FWSInterpreter {
             }
           }
         }
-/*
-        Left(NotImplementedYet("evaluation for method calls"))  // TEMPORARY
-*/
+    }
+
+
+  val astOfPath : Path => Ast =
+    path => {
+      path match { case Path(x, vlabels) =>
+        vlabels.foldLeft(Var(x) : Ast){ (astacc, vlabel) =>
+          Access(astacc, vlabel)
+        }
+      }
+    }
+
+
+  def interpretType(env : Env, ty : Type) : Either[EvalError, TypeValue] =
+    ty match {
+      case TypeSelection(path, tlabel) =>
+        val ast = astOfPath(path);
+        interpretAst(env, ast) flatMap { case ValVar(x) =>
+          Right(ValTypeSelection(x, tlabel))
+        }
+
+      case SingletonType(path) =>
+        Right(ValSingletonType(path))
+
+      case TypeSignature(tysig) =>
+        interpretIntersection(env, tysig) flatMap { case tyvalsig =>
+          Right(ValTypeSignature(tyvalsig))
+        }
+    }
+
+
+  def interpretIntersection(env : Env, tysig : Intersection[Type]) : Either[EvalError, Intersection[TypeValue]] =
+    tysig match { case Intersection(tys, x, decls) =>
+        val resInit : Either[EvalError, List[TypeValue]] = Right(Nil);
+        tys.foldLeft(resInit){ case (accres, ty) =>
+          accres flatMap { tyvalacc =>
+            interpretType(env, ty) flatMap { tyval =>
+              Right(tyval :: tyvalacc)
+            }
+          }
+        } flatMap { case tyvalsrev =>
+          val tyvals = tyvalsrev.reverse;
+          Right(Intersection(tyvals, x, decls))
+        }
     }
 
 
@@ -123,7 +166,7 @@ class FWSInterpreter {
         val lst : List[(Value, (String, Type))] = vargs.zip(params);
         val astImpNew : Ast = {
           lst.foldLeft(astImp){ case (astImp, (varg, (x, _))) =>
-            substitute(varg, x, astImp)
+            substituteAst(varg, x, astImp)
           }
         };
         Right(astImpNew)
@@ -131,9 +174,9 @@ class FWSInterpreter {
     }
 
 
-  val substitute : (Value, String, Ast) => Ast =
+  val substituteAst : (Value, String, Ast) => Ast =
     (value, x, ast) => {
-      val iter = substitute(value, x, _);
+      val iter = substituteAst(value, x, _);
       ast match {
         case ValNewIn(y, ty, ast0) =>
           if (y == x) { ast } else {
@@ -152,21 +195,29 @@ class FWSInterpreter {
     }
 
 
-  def lookupDeclarations(env : Env, ty : Type, x : String) : Either[EvalError, List[Declaration]] =
+  def lookupDeclarations(env : Env, tyval : TypeValue, x : String) : Either[EvalError, List[Declaration]] =
     // FIXME; should apply to "type values", not to types
-    ty match {
-      case TypeSelection(Path(x, _), tlabel) =>
+    tyval match {
+      case ValTypeSelection(x, tlabel) =>
         env.findTypeDecl(x, tlabel) match {
-          case None                      => Left(TypeLabelNotFound(tlabel))
-          case Some(DeclType(None))      => Left(TypeNotEmbodied(tlabel))
-          case Some(DeclType(Some(ty0))) => lookupDeclarations(env, ty0, x)
-          case Some(DeclTrait(tysig))    => lookupDeclarations(env, TypeSignature(tysig), x)
+          case None                 => Left(TypeLabelNotFound(tlabel))
+          case Some(DeclType(None)) => Left(TypeNotEmbodied(tlabel))
+
+          case Some(DeclType(Some(ty0))) =>
+            interpretType(env, ty0) flatMap { tyval0 =>
+              lookupDeclarations(env, tyval0, x)
+            }
+
+          case Some(DeclTrait(tysig)) =>
+            interpretIntersection(env, tysig) flatMap { tyvalsig =>
+              lookupDeclarations(env, ValTypeSignature(tyvalsig), x)
+            }
         }
 
-      case TypeSignature(tysig) =>
+      case ValTypeSignature(tyvalsig) =>
         Right(Nil)  // TEMPORARY
 
-      case SingletonType(p) =>
+      case ValSingletonType(p) =>
         Right(Nil)  // TEMPORARY
 
     }
