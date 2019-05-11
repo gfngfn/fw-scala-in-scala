@@ -11,13 +11,13 @@ case class Call(e : Ast, vl : String, es : List[Ast]) extends Ast
 case class Path(x : String, vls : List[String])
 
 
-case class Intersection(tys : List[Type], x : String, decls : List[Declaration])
+case class Intersection[A](tys : List[A], x : String, decls : List[Declaration])
 
 
 sealed trait Type
-case class TypeSelection(p : Path, tl : String) extends Type
-case class SingletonType(sty : Path)            extends Type
-case class TypeSignature(tysig : Intersection)  extends Type
+case class TypeSelection(p : Path, tl : String)      extends Type
+case class SingletonType(p : Path)                   extends Type
+case class TypeSignature(tysig : Intersection[Type]) extends Type
 
 
 sealed trait Value
@@ -28,14 +28,20 @@ case class ValVar(x : String) extends Value
      -- */
 
 
+sealed trait TypeValue
+case class ValTypeSelection(x : Var, tl : String)            extends TypeValue
+case class ValSingletonType(p : Path)                        extends TypeValue
+case class ValTypeSignature(tysig : Intersection[TypeValue]) extends TypeValue
+
+
 sealed trait ValueDeclBody
 case class DeclVal(ty : Type, eopt : Option[Ast])                                   extends ValueDeclBody
 case class DeclDef(params : List[(String, Type)], tyans : Type, eopt : Option[Ast]) extends ValueDeclBody
 
 
 sealed trait TypeDeclBody
-case class DeclType(tyopt : Option[Type])  extends TypeDeclBody
-case class DeclTrait(tysig : Intersection) extends TypeDeclBody
+case class DeclType(tyopt : Option[Type])        extends TypeDeclBody
+case class DeclTrait(tysig : Intersection[Type]) extends TypeDeclBody
 
 
 sealed trait Declaration
@@ -108,7 +114,7 @@ object FWSParser extends JavaTokenParsers {
       case p => SingletonType(p)
     }
 
-  def typeSignature : Parser[Intersection] =
+  def typeSignature : Parser[Intersection[Type]] =
     "(" ~> ((rep1sep(typ, ",") <~ ")") <~ "{") ~ (variable <~ "|") ~ (rep(decl) <~ "}") ^^ {
       case tys ~ x ~ decls => Intersection(tys, x, decls)
     }
