@@ -1,44 +1,4 @@
 
-
-trait Env {
-
-  type ValueMap = Map[String, ValueDeclBody]
-  type TypeMap  = Map[String, TypeDeclBody]
-
-  val body : Map[String, (ValueMap, TypeMap)]
-
-  def +(x : String, decls : List[Declaration]) = {
-    val mapPair : (ValueMap, TypeMap) = {
-      val init : (ValueMap, TypeMap) = (Map(), Map());
-      decls.foldLeft(init){ case ((valmap, tymap), decl) =>
-        decl match {
-          case DeclForValueLabel(vl, vd) => (valmap + ((vl, vd)), tymap)
-          case DeclForTypeLabel(tl, td)  => (valmap, tymap + ((tl, td)))
-        }
-      }
-    };
-    new Env { val body = Env.this.body + ((x, mapPair)) }
-  }
-
-
-  def findValueDecl(x : String, vlabel : String) : Option[ValueDeclBody] =
-    body.get(x) flatMap { case (valmap, _) =>
-      valmap.get(vlabel)
-    }
-
-
-  def findTypeDecl(x : String, tlabel : String) : Option[TypeDeclBody] =
-    body.get(x) flatMap { case (_, tymap) =>
-      tymap.get(tlabel)
-    }
-
-}
-
-class EmptyEnv extends Env {
-  val body : Map[String, (ValueMap, TypeMap)] = Map()
-}
-
-
 sealed trait EvalError
 case class NotImplementedYet(msg : String)            extends EvalError
 case class ValueLabelNotFound(vl : String)            extends EvalError
@@ -49,8 +9,86 @@ case class TypeNotEmbodied(tl : String)               extends EvalError
 case class NotAFieldButAMethod(vl : String)           extends EvalError
 case class NotAMethodButAField(vl : String)           extends EvalError
 case class WrongNumberOfArguments(le : Int, la : Int) extends EvalError
+case class CannotLookupSingletonType(p : Path)        extends EvalError
+
 
 class FWSInterpreter {
+
+
+  trait MapPair {
+
+    type ValueMap = Map[String, ValueDeclBody]
+    type TypeMap  = Map[String, TypeDeclBody]
+
+    val body : (ValueMap, TypeMap)
+
+
+    def getValue(vlabel : String) : Option[ValueDeclBody] =
+      body match { case (valmap, _) => valmap.get(vlabel) }
+
+
+    def getType(tlabel : String) : Option[TypeDeclBody] =
+      body match { case (_, tymap) => tymap.get(tlabel) }
+
+
+    def mergeByRightHandSidePriority[K, V](map1 : Map[K, V], map2 : Map[K, V]) : Map[K, V] =
+      map2.foldLeft(map1){ case (map, (k, v)) =>
+        map + ((k, v))
+      }
+
+
+    def concat(mapPair2 : MapPair) : MapPair =
+      (body, mapPair2.body) match { case ((valmap1, tymap1), (valmap2, tymap2)) =>
+        val valmap = mergeByRightHandSidePriority(valmap1, valmap2);
+        val tymap = mergeByRightHandSidePriority(tymap1, tymap2);
+        new MapPair { val body = (valmap, tymap) }
+      }
+  }
+
+  class EmptyMapPair extends MapPair {
+    val body = (Map(), Map())
+  }
+
+  class MapPairOfDeclarations(decls : List[Declaration]) extends MapPair {
+    val body = {
+      val init : (ValueMap, TypeMap) = (Map(), Map());
+      decls.foldLeft(init){ case ((valmap, tymap), decl) =>
+        decl match {
+          case DeclForValueLabel(vl, vd) => (valmap + ((vl, vd)), tymap)
+          case DeclForTypeLabel(tl, td)  => (valmap, tymap + ((tl, td)))
+        }
+      }
+    }
+  }
+
+
+  trait Env {
+
+    val body : Map[String, MapPair]
+
+
+    def add(x : String, mapPair : MapPair) : Env = {
+      new Env { val body = Env.this.body + ((x, mapPair)) }
+    }
+
+
+    def findValueDecl(x : String, vlabel : String) : Option[ValueDeclBody] =
+      body.get(x) flatMap { mapPair =>
+        mapPair.getValue(vlabel)
+      }
+
+
+    def findTypeDecl(x : String, tlabel : String) : Option[TypeDeclBody] =
+      body.get(x) flatMap { case mapPair =>
+        mapPair.getType(tlabel)
+      }
+
+  }
+
+  class EmptyEnv extends Env {
+    val body = Map()
+  }
+
 
   def run(ast : Ast) : Unit = {
     val env = new EmptyEnv;
@@ -68,8 +106,8 @@ class FWSInterpreter {
     ast match {
       case ValNewIn(x, ty, ast0) =>
         interpretType(env, ty) flatMap { tyval =>
-          lookupDeclarations(env, tyval, x) flatMap { decls =>
-            interpretAst(env + (x, decls), ast0)
+          lookupDeclarations(env, tyval, x) flatMap { mapPair =>
+            interpretAst(env.add(x, mapPair), ast0)
           }
         }
 
@@ -195,8 +233,7 @@ class FWSInterpreter {
     }
 
 
-  def lookupDeclarations(env : Env, tyval : TypeValue, x : String) : Either[EvalError, List[Declaration]] =
-    // FIXME; should apply to "type values", not to types
+  def lookupDeclarations(env : Env, tyval : TypeValue, x : String) : Either[EvalError, MapPair] =
     tyval match {
       case ValTypeSelection(x, tlabel) =>
         env.findTypeDecl(x, tlabel) match {
@@ -214,11 +251,24 @@ class FWSInterpreter {
             }
         }
 
-      case ValTypeSignature(tyvalsig) =>
-        Right(Nil)  // TEMPORARY
+      case ValTypeSignature(Intersection(tyvals, phi, decls0)) => {
+        val mapPairInit : MapPair = new EmptyMapPair;
+        val resInit : Either[EvalError, MapPair] = Right(mapPairInit);
+        tyvals.foldLeft(resInit){ (res, tyval) =>
+          res flatMap { case mapPairAcc =>
+            lookupDeclarations(env, tyval, x) flatMap { case mapPair =>
+              Right((mapPairAcc.concat(mapPair)))
+            }
+          }
+        } flatMap { case mapPairAcc =>
+          val mapPair0 = new MapPairOfDeclarations(decls0);
+          Right(mapPairAcc.concat(mapPair0))
+        }
+      }
+
 
       case ValSingletonType(p) =>
-        Right(Nil)  // TEMPORARY
+        Left(CannotLookupSingletonType(p))
 
     }
 }
