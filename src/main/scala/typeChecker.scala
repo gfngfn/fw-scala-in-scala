@@ -4,6 +4,7 @@ case class TypeNotAFieldButAMethod(vl : String)           extends TypeError
 case class TypeNotAMethodButAField(vl : String)           extends TypeError
 case class TypeWrongNumberOfArguments(la : Int, lp : Int) extends TypeError
 case class VariableExtrudesItsScope(x : String, ty : Type) extends TypeError
+case class UndefinedVariable(x : String)                   extends TypeError
 
 
 class Store {}  // TEMPORARY
@@ -14,6 +15,10 @@ trait TypeEnv {
 
   def add(x : String, ty : Type) : TypeEnv =
     new TypeEnv { val body = TypeEnv.this.body + ((x, ty)) }
+
+
+  def findVariable(x : String) : Option[Type] =
+    body.get(x)
 
 }
 
@@ -135,7 +140,21 @@ object FWSTypeChecker {
 
 
   def typeCheckPath(store : Store, tyenv : TypeEnv, path : Path) : Either[TypeError, Type] =
-    ???
+    path match { case Path(x, vlabels) =>
+      vlabels.reverse match {
+        case Nil =>
+          tyenv.findVariable(x) match {
+            case None     => Left(UndefinedVariable(x))
+            case Some(ty) => Right(ty)
+          }
+
+        case vlabelLast :: vlabelRevTail =>
+          membership(store, tyenv, SingletonType(Path(x, vlabelRevTail.reverse)), vlabelLast) flatMap {
+            case DeclVal(ty, _)   => Right(ty)
+            case DeclDef(_, _, _) => Left(TypeNotAFieldButAMethod(vlabelLast))
+          }
+      }
+    }
 
 
   def membership(store : Store, tyenv : TypeEnv, ty : Type, vlabel : String) : Either[TypeError, ValueDeclBody] =
