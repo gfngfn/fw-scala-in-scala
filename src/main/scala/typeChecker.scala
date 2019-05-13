@@ -1,8 +1,8 @@
 
 sealed trait TypeError
-case class TypeNotAFieldButAMethod(vl : String)           extends TypeError
-case class TypeNotAMethodButAField(vl : String)           extends TypeError
-case class TypeWrongNumberOfArguments(la : Int, lp : Int) extends TypeError
+case class TypeNotAFieldButAMethod(vl : String)            extends TypeError
+case class TypeNotAMethodButAField(vl : String)            extends TypeError
+case class TypeWrongNumberOfArguments(la : Int, lp : Int)  extends TypeError
 case class VariableExtrudesItsScope(x : String, ty : Type) extends TypeError
 case class UndefinedVariable(x : String)                   extends TypeError
 
@@ -125,14 +125,9 @@ object FWSTypeChecker {
   def pathOfAstIfPossible(ast : Ast) : Option[Path] = {
     def aux(vlabelacc : List[String], ast : Ast) : Option[Path] = {
       ast match {
-        case Access(ast0, vlabel) =>
-          aux(vlabel :: vlabelacc, ast0)
-
-        case Var(x) =>
-          Some(Path(x, vlabelacc.reverse))
-
-        case _ =>
-          None
+        case Access(ast0, vlabel) => aux(vlabel :: vlabelacc, ast0)
+        case Var(x)               => Some(Path(x, vlabelacc.reverse))
+        case _                    => None
       }
     };
     aux(Nil, ast)
