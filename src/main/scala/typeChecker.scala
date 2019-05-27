@@ -17,14 +17,20 @@ case class AlreadySeen(did : DeclarationID)                extends TypeError
 
 trait Store {
 
+  val body : Set[DeclarationID]
+
   def contains(did : DeclarationID) : Boolean =
-    ???
+    body.contains(did)
 
 
   def add(did : DeclarationID) : Store =
-    ???
+    new Store { val body = Store.this.body + did }
 
-}  // TEMPORARY
+}
+
+trait EmptyStore extends Store {
+  val body = Set.empty
+}
 
 
 trait TypeEnv {
@@ -47,8 +53,12 @@ class EmptyTypeEnv extends TypeEnv {
 
 object FWSTypeChecker {
 
-  def generateFreshVariable() : String =
-    ???
+  var currentMaxID : Int = 0
+
+  def generateFreshVariable() : String = {
+    currentMaxID += 1;
+    "%v" + currentMaxID
+  }
 
 
   def typeCheck(store : Store, tyenv : TypeEnv, ast : Ast) : Either[TypeError, Type] =
