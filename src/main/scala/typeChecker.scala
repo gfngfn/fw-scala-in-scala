@@ -140,20 +140,41 @@ object FWSTypeChecker {
 
   def occursInType(x : String, ty : Type) : Boolean =
     ty match {
-      case SingletonType(Path(y, _)) =>
-        x == y
-
-      case TypeSignature(Intersection(tys, phi, decls)) =>
-        val bI = tys.forall(occursInType(x, _));
-        val bD = if (x == phi) false else occursInDecls(x, decls);
-        bI && bD
-
-      case TypeSelection(path, tlabel) =>
-        ???
+      case SingletonType(Path(y, _))    => x == y
+      case TypeSignature(tysig)         => occursInIntersection(x, tysig)
+      case TypeSelection(Path(y, _), _) => x == y
     }
 
 
-  def occursInDecls(x : String, decls : List[Declaration]) =
+  def occursInIntersection(x : String, tysig : Intersection[Type]) : Boolean =
+    tysig match {
+      case Intersection(tys, phi, decls) =>
+        val bI = tys.exists(occursInType(x, _));
+        val bD = if (x == phi) false else decls.exists(occursInDecl(x, _));
+        bI || bD
+    }
+
+
+  def occursInDecl(x : String, decl : Declaration) : Boolean =
+    decl match {
+      case DeclForValueLabel(_, vd) =>
+        vd match {
+          case DeclVal(ty, eopt) =>
+            occursInType(x, ty) || eopt.map(occursInAst(x, _)).getOrElse(false)
+
+          case DeclDef(params, tyans, eopt) =>
+            ???
+        }
+
+      case DeclForTypeLabel(_, td) =>
+        td match {
+          case DeclType(tyopt)  => tyopt.map(occursInType(x, _)).getOrElse(false)
+          case DeclTrait(tysig) => occursInIntersection(x, tysig)
+        }
+    }
+
+
+  def occursInAst(x : String, e : Ast) : Boolean =
     ???
 
 
