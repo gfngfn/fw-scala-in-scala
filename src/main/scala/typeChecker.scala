@@ -139,6 +139,21 @@ object FWSTypeChecker {
 
 
   def occursInType(x : String, ty : Type) : Boolean =
+    ty match {
+      case SingletonType(Path(y, _)) =>
+        x == y
+
+      case TypeSignature(Intersection(tys, phi, decls)) =>
+        val bI = tys.forall(occursInType(x, _));
+        val bD = if (x == phi) false else occursInDecls(x, decls);
+        bI && bD
+
+      case TypeSelection(path, tlabel) =>
+        ???
+    }
+
+
+  def occursInDecls(x : String, decls : List[Declaration]) =
     ???
 
 
