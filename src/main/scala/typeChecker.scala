@@ -189,8 +189,13 @@ object FWSTypeChecker {
     }
 
 
-  def occursInAst(x : String, e : Ast) : Boolean =
-    ???
+  def occursInAst(x : String, ast : Ast) : Boolean =
+    ast match {
+      case ValNewIn(y, ty, ast0)  => if (y == x) false else { occursInType(x, ty) || occursInAst(x, ast0) }
+      case Var(y)                 => y == x
+      case Access(ast0, _)        => occursInAst(x, ast0)
+      case Call(ast0, _, astargs) => occursInAst(x, ast0) || astargs.exists(occursInAst(x, _))
+    }
 
 
   def expandType(store : Store, tyenv : TypeEnv, x : String, ty : Type) : Either[TypeError, List[Declaration]] =
