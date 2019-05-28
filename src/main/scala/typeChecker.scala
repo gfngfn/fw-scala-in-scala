@@ -13,6 +13,8 @@ case class TypeWrongNumberOfArguments(la : Int, lp : Int)  extends TypeError
 case class VariableExtrudesItsScope(x : String, ty : Type) extends TypeError
 case class UndefinedVariable(x : String)                   extends TypeError
 case class AlreadySeen(did : DeclarationID)                extends TypeError
+case class CannotExpandSingletonType(p : Path)             extends TypeError
+case class NonEmbodiedTypeLabel(tl : String)               extends TypeError
 
 
 trait Store {
@@ -68,7 +70,7 @@ object FWSTypeChecker {
           case None =>
           /* -- if the expression 'ast0' is not (interprettable as) a path -- */
             typeCheck(store, tyenv, ast0) flatMap { ty0 =>
-              membership(store, tyenv, ty0, vlabel) flatMap {
+              valueMembership(store, tyenv, ty0, vlabel) flatMap {
                 case DeclVal(ty, _) =>
                   Right(ty)
 
@@ -84,7 +86,7 @@ object FWSTypeChecker {
 
       case Call(ast0, vlabel, astargs) =>
         typeCheck(store, tyenv, ast0) flatMap { ty0 =>
-          membership(store, tyenv, ty0, vlabel) flatMap {
+          valueMembership(store, tyenv, ty0, vlabel) flatMap {
             case DeclVal(_, _) =>
               Left(TypeNotAMethodButAField(vlabel))
 
@@ -199,7 +201,24 @@ object FWSTypeChecker {
 
 
   def expandType(store : Store, tyenv : TypeEnv, x : String, ty : Type) : Either[TypeError, List[Declaration]] =
-    ???
+    ty match {
+      case TypeSelection(path, tlabel) =>
+        typeMembership(store, tyenv, SingletonType(path), tlabel) flatMap { td =>
+          td match {
+            case DeclType(None) =>
+              Left(NonEmbodiedTypeLabel(tlabel))
+
+            case DeclType(Some(tyT)) => ???
+            case DeclTrait(tysig) => ???
+          }
+        }
+
+      case SingletonType(path) =>
+        Left(CannotExpandSingletonType(path))
+
+      case TypeSignature(tysig) =>
+        ???
+    }
 
 
   def checkTypeWellFormedness(store : Store, tyenv :TypeEnv, ty : Type) : Either[TypeError, Unit] =
@@ -239,48 +258,86 @@ object FWSTypeChecker {
           case Some(ty) => Right(ty)
         }
 
-      case Right((pathRest, vlabelLast)) =>
-        membership(store, tyenv, SingletonType(pathRest), vlabelLast) flatMap {
+      case Right((pathRest, vlabel)) =>
+        valueMembership(store, tyenv, SingletonType(pathRest), vlabel) flatMap {
           case DeclVal(ty, _)   => Right(ty)
-          case DeclDef(_, _, _) => Left(TypeNotAFieldButAMethod(vlabelLast))
+          case DeclDef(_, _, _) => Left(TypeNotAFieldButAMethod(vlabel))
         }
     }
 
 
-  def membership(store : Store, tyenv : TypeEnv, ty : Type, vlabel : String) : Either[TypeError, ValueDeclBody] = {
+  def valueMembership(store : Store, tyenv : TypeEnv, ty : Type, vlabel : String) : Either[TypeError, ValueDeclBody] =
+    members(store, tyenv, ty) flatMap { decls =>
+      ???
+        /* TEMPORARY; should find the declaration for `vlabel` in `decls`
+           and replace the occurrences of `phi` with `pathP`
+        */
+    }
+
+
+  def typeMembership(store : Store, tyenv : TypeEnv, ty : Type, tlabel : String) : Either[TypeError, TypeDeclBody] =
+    members(store, tyenv, ty) flatMap { decls =>
+      ???
+        /* TEMPORARY; should find the declaration for `vlabel` in `decls`,
+           checks `phi` does not freely occurs in the declaration,
+           and then return the declaration.
+        */
+    }
+
+
+  def members(store : Store, tyenv : TypeEnv, ty : Type) : Either[TypeError, List[Declaration]] = {
     val phi : String = generateFreshVariable();
     ty match {
       case SingletonType(pathP) =>
         expandPathAlias(store, tyenv, pathP) flatMap { case (pathQ, tyT) =>
-          getDeclarationID(store, tyenv, pathP) flatMap { did =>
-            if (store.contains(did)) {
-              Left(AlreadySeen(did))
-            } else {
-              expandType(store.add(did), tyenv, phi, tyT) flatMap { decls =>
-                ???
-              }
-            }
+          extendStoreByPath(store, tyenv, pathP) flatMap { store =>
+            expandType(store, tyenv, phi, tyT)
           }
         }
 
       case _ =>
-        expandType(store, tyenv, phi, ty) flatMap { decls =>
-          ???
-        }
+        expandType(store, tyenv, phi, ty)
     }
   }
 
 
-  def getDeclarationID(store : Store, tyenv : TypeEnv, path : Path) : Either[TypeError, DeclarationID] =
-    separateLastLabel(path) match {
-      case Left(x) =>
-        ???
+  def expandPathAlias(store : Store, tyenv : TypeEnv, pathP : Path) : Either[TypeError, (Path, Type)] =
+    typeCheckPath(store, tyenv, pathP) flatMap { ty =>
+      ty match {
+        case SingletonType(pathQ) =>
+          extendStoreByPath(store, tyenv, pathQ) flatMap { store =>
+            expandPathAlias(store, tyenv, pathQ)
+          }
 
-      case Right((pathP, vlabel)) =>
-        ???
+        case _ =>
+          Right((pathP, ty))
+      }
     }
 
 
-  def expandPathAlias(store : Store, tyenv : TypeEnv, path : Path) : Either[TypeError, (Path, Type)] =
-    ???
+  def extendStoreByPath(store : Store, tyenv : TypeEnv, path : Path) : Either[TypeError, Store] =
+    separateLastLabel(path) match {
+      case Left(x) =>
+        Right(store)
+
+      case Right((pathP, vlabel)) =>
+        valueMembership(store, tyenv, SingletonType(pathP), vlabel) flatMap { vd =>
+          vd match {
+            case DeclVal(_, _) =>
+              val did: DeclarationID = ???;
+                /* TEMPORARY; should get the ID of the declaration,
+                   check that the ID is not contained in the store,
+                   and then add the ID to the store.
+                */
+              if (store.contains(did)) {
+                Left(AlreadySeen(did))
+              } else {
+                Right(store.add(did))
+              }
+
+            case DeclDef(_, _, _) =>
+              Left(TypeNotAFieldButAMethod(vlabel))
+          }
+        }
+    }
 }
