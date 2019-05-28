@@ -159,11 +159,26 @@ object FWSTypeChecker {
     decl match {
       case DeclForValueLabel(_, vd) =>
         vd match {
-          case DeclVal(ty, eopt) =>
-            occursInType(x, ty) || eopt.map(occursInAst(x, _)).getOrElse(false)
+          case DeclVal(ty, astopt) =>
+            occursInType(x, ty) || astopt.map(occursInAst(x, _)).getOrElse(false)
 
-          case DeclDef(params, tyans, eopt) =>
-            ???
+          case DeclDef(params, tyans, astopt) =>
+            /* `bName`: whether the list of parameters contains a variable having the same name as `x`
+               `bOccur`: whether `x` occurs in some of the types of the parameters
+             */
+            val (bName, bOccur) = {
+              params.foldLeft((false, false)){ case ((bName, bOccur), (y, ty)) =>
+                (bName || x == y, bOccur || occursInType(x, ty))
+              }
+            };
+            if (bName) {
+              bOccur
+            } else {
+              astopt match {
+                case None      => bOccur
+                case Some(ast) => bOccur || occursInAst(x, ast)
+              }
+            }
         }
 
       case DeclForTypeLabel(_, td) =>
