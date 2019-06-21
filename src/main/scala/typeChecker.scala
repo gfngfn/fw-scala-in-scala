@@ -193,7 +193,7 @@ object FWSTypeChecker {
     }
 
 
-  def expandType(store : Store, tyenv : TypeEnv, x : String, ty : Type) : Either[TypeError, List[Declaration]] =
+  def expandType(store : Store, tyenv : TypeEnv, x : String, ty : Type) : Either[TypeError, MapPair] =
     ty match {
       case TypeSelection(path, tlabel) =>
         typeMembership(store, tyenv, SingletonType(path), tlabel) flatMap { td =>
@@ -202,18 +202,38 @@ object FWSTypeChecker {
               Left(NonEmbodiedTypeLabel(tlabel))
 
             case DeclType(did, Some(tyT)) =>
-              ???
+              if (store.contains(did)) {
+                Left(AlreadySeen(did))
+              } else {
+                expandType(store.add(did), tyenv, x, tyT)
+              }
 
             case DeclTrait(did, tysig) =>
-              ???
+              if (store.contains(did)) {
+                Left(AlreadySeen(did))
+              } else {
+                val tysub : Type = TypeSignature(tysig)
+                  /* TEMPORARY: should rename variables by using `phi` and `x` */
+                expandType(store.add(did), tyenv, x, tysub)
+              }
           }
         }
 
       case SingletonType(path) =>
         Left(CannotExpandSingletonType(path))
 
-      case TypeSignature(tysig) =>
-        ???
+      case TypeSignature(Intersection(tys, phi, decls)) =>
+        val init : Either[TypeError, MapPair] = Right(new EmptyMapPair())
+        tys.foldLeft(init) { (acc, ty) =>
+          acc flatMap { mapPairAcc =>
+            expandType(store, tyenv, x, ty) flatMap { mapPair =>
+              Right(mapPairAcc.concat(mapPair))
+            }
+          }
+        } flatMap { mapPairMs =>
+          val mapPairN = new MapPairOfDeclarations(decls)
+          Right(mapPairMs.concat(mapPairN))
+        }
     }
 
 
@@ -281,7 +301,7 @@ object FWSTypeChecker {
     }
 
 
-  def members(store : Store, tyenv : TypeEnv, ty : Type) : Either[TypeError, List[Declaration]] = {
+  def members(store : Store, tyenv : TypeEnv, ty : Type) : Either[TypeError, MapPair] = {
     val phi : String = generateFreshVariable();
     ty match {
       case SingletonType(pathP) =>
@@ -319,12 +339,7 @@ object FWSTypeChecker {
       case Right((pathP, vlabel)) =>
         valueMembership(store, tyenv, SingletonType(pathP), vlabel) flatMap { vd =>
           vd match {
-            case DeclVal(_, _, _) =>
-              val did: DeclarationID = ???;
-                /* TEMPORARY; should get the ID of the declaration,
-                   check that the ID is not contained in the store,
-                   and then add the ID to the store.
-                */
+            case DeclVal(did, _, _) =>
               if (store.contains(did)) {
                 Left(AlreadySeen(did))
               } else {
