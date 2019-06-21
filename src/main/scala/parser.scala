@@ -34,14 +34,33 @@ case class ValSingletonType(p : Path)                        extends TypeValue
 case class ValTypeSignature(tysig : Intersection[TypeValue]) extends TypeValue
 
 
+class DeclarationID(_n : Int) {
+
+  val body : Int = _n
+
+  def equal(did : DeclarationID) : Boolean =
+    _n == did.body
+}
+
+object DeclarationID {
+
+  var currentMaxID : Int = 0
+
+  def apply() = {
+    currentMaxID += 1
+    new DeclarationID(currentMaxID)
+  }
+}
+
+
 sealed trait ValueDeclBody
-case class DeclVal(ty : Type, eopt : Option[Ast])                                   extends ValueDeclBody
-case class DeclDef(params : List[(String, Type)], tyans : Type, eopt : Option[Ast]) extends ValueDeclBody
+case class DeclVal(did : DeclarationID, ty : Type, eopt : Option[Ast])                                   extends ValueDeclBody
+case class DeclDef(did : DeclarationID, params : List[(String, Type)], tyans : Type, eopt : Option[Ast]) extends ValueDeclBody
 
 
 sealed trait TypeDeclBody
-case class DeclType(tyopt : Option[Type])        extends TypeDeclBody
-case class DeclTrait(tysig : Intersection[Type]) extends TypeDeclBody
+case class DeclType(did : DeclarationID, tyopt : Option[Type])        extends TypeDeclBody
+case class DeclTrait(did : DeclarationID, tysig : Intersection[Type]) extends TypeDeclBody
 
 
 sealed trait Declaration
@@ -127,16 +146,24 @@ object FWSParser extends JavaTokenParsers {
 
   def decl : Parser[Declaration] =
     ( "val" ~> (valueLabel <~ ":") ~ typ ~ opt("=" ~> expr) ^^ {
-        case vl ~ ty ~ eopt => DeclForValueLabel(vl, DeclVal(ty, eopt))
+        case vl ~ ty ~ eopt =>
+          val did = DeclarationID()
+          DeclForValueLabel(vl, DeclVal(did, ty, eopt))
       }
     | "def" ~> valueLabel ~ (params <~ ":") ~ typ ~ opt("=" ~> expr) ^^ {
-        case vl ~ pars ~ ty ~ eopt => DeclForValueLabel(vl, DeclDef(pars, ty, eopt))
+        case vl ~ pars ~ ty ~ eopt =>
+          val did = DeclarationID()
+          DeclForValueLabel(vl, DeclDef(did, pars, ty, eopt))
       }
     | "type" ~> typeLabel ~ opt("=" ~> typ) ^^ {
-        case tl ~ tyopt => DeclForTypeLabel(tl, DeclType(tyopt))
+        case tl ~ tyopt =>
+          val did = DeclarationID()
+          DeclForTypeLabel(tl, DeclType(did, tyopt))
       }
     | "trait" ~> typeLabel ~ typeSignature ^^ {
-        case tl ~ tysig => DeclForTypeLabel(tl, DeclTrait(tysig))
+        case tl ~ tysig =>
+          val did = DeclarationID()
+          DeclForTypeLabel(tl, DeclTrait(did, tysig))
       }
     )
 

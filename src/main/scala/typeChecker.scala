@@ -1,11 +1,4 @@
 
-trait DeclarationID {
-
-  val body : Option[Int]
-
-}  // TEMPORARY
-
-
 sealed trait TypeError
 case class TypeNotAFieldButAMethod(vl : String)            extends TypeError
 case class TypeNotAMethodButAField(vl : String)            extends TypeError
@@ -71,10 +64,10 @@ object FWSTypeChecker {
           /* -- if the expression 'ast0' is not (interprettable as) a path -- */
             typeCheck(store, tyenv, ast0) flatMap { ty0 =>
               valueMembership(store, tyenv, ty0, vlabel) flatMap {
-                case DeclVal(ty, _) =>
+                case DeclVal(_, ty, _) =>
                   Right(ty)
 
-                case DeclDef(_, _, _) =>
+                case DeclDef(_, _, _, _) =>
                   Left(TypeNotAFieldButAMethod(vlabel))
               }
             }
@@ -87,10 +80,10 @@ object FWSTypeChecker {
       case Call(ast0, vlabel, astargs) =>
         typeCheck(store, tyenv, ast0) flatMap { ty0 =>
           valueMembership(store, tyenv, ty0, vlabel) flatMap {
-            case DeclVal(_, _) =>
+            case DeclVal(_, _, _) =>
               Left(TypeNotAMethodButAField(vlabel))
 
-            case DeclDef(params, tyans, _) =>
+            case DeclDef(_, params, tyans, _) =>
               typeCheckParams(store, tyenv, params, astargs) flatMap { _ =>
                 Right(tyans)
               }
@@ -161,10 +154,10 @@ object FWSTypeChecker {
     decl match {
       case DeclForValueLabel(_, vd) =>
         vd match {
-          case DeclVal(ty, astopt) =>
+          case DeclVal(_, ty, astopt) =>
             occursInType(x, ty) || astopt.map(occursInAst(x, _)).getOrElse(false)
 
-          case DeclDef(params, tyans, astopt) =>
+          case DeclDef(_, params, tyans, astopt) =>
             /* `bName`: whether the list of parameters contains a variable having the same name as `x`
                `bOccur`: whether `x` occurs in some of the types of the parameters
              */
@@ -185,8 +178,8 @@ object FWSTypeChecker {
 
       case DeclForTypeLabel(_, td) =>
         td match {
-          case DeclType(tyopt)  => tyopt.map(occursInType(x, _)).getOrElse(false)
-          case DeclTrait(tysig) => occursInIntersection(x, tysig)
+          case DeclType(_, tyopt)  => tyopt.map(occursInType(x, _)).getOrElse(false)
+          case DeclTrait(_, tysig) => occursInIntersection(x, tysig)
         }
     }
 
@@ -205,11 +198,14 @@ object FWSTypeChecker {
       case TypeSelection(path, tlabel) =>
         typeMembership(store, tyenv, SingletonType(path), tlabel) flatMap { td =>
           td match {
-            case DeclType(None) =>
+            case DeclType(_, None) =>
               Left(NonEmbodiedTypeLabel(tlabel))
 
-            case DeclType(Some(tyT)) => ???
-            case DeclTrait(tysig) => ???
+            case DeclType(did, Some(tyT)) =>
+              ???
+
+            case DeclTrait(did, tysig) =>
+              ???
           }
         }
 
@@ -260,8 +256,8 @@ object FWSTypeChecker {
 
       case Right((pathRest, vlabel)) =>
         valueMembership(store, tyenv, SingletonType(pathRest), vlabel) flatMap {
-          case DeclVal(ty, _)   => Right(ty)
-          case DeclDef(_, _, _) => Left(TypeNotAFieldButAMethod(vlabel))
+          case DeclVal(_, ty, _)   => Right(ty)
+          case DeclDef(_, _, _, _) => Left(TypeNotAFieldButAMethod(vlabel))
         }
     }
 
@@ -323,7 +319,7 @@ object FWSTypeChecker {
       case Right((pathP, vlabel)) =>
         valueMembership(store, tyenv, SingletonType(pathP), vlabel) flatMap { vd =>
           vd match {
-            case DeclVal(_, _) =>
+            case DeclVal(_, _, _) =>
               val did: DeclarationID = ???;
                 /* TEMPORARY; should get the ID of the declaration,
                    check that the ID is not contained in the store,
@@ -335,7 +331,7 @@ object FWSTypeChecker {
                 Right(store.add(did))
               }
 
-            case DeclDef(_, _, _) =>
+            case DeclDef(_, _, _, _) =>
               Left(TypeNotAFieldButAMethod(vlabel))
           }
         }

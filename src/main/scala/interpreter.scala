@@ -117,20 +117,20 @@ class FWSInterpreter {
       case Access(ast0, vlabel) =>
         interpretAst(env, ast0) flatMap { case ValVar(x) =>
           env.findValueDecl(x, vlabel) match {
-            case None                            => Left(ValueLabelNotFound(vlabel))
-            case Some(DeclDef(_, _, _))          => Left(NotAFieldButAMethod(vlabel))
-            case Some(DeclVal(_, None))          => Left(FieldNotEmbodied(vlabel))
-            case Some(DeclVal(ty, Some(astNew))) => interpretAst(env, astNew)
+            case None                               => Left(ValueLabelNotFound(vlabel))
+            case Some(DeclDef(_, _, _, _))          => Left(NotAFieldButAMethod(vlabel))
+            case Some(DeclVal(_, _, None))          => Left(FieldNotEmbodied(vlabel))
+            case Some(DeclVal(_, ty, Some(astNew))) => interpretAst(env, astNew)
           }
         }
 
       case Call(ast0, vlabel, astargs) =>
         interpretAst(env, ast0) flatMap { case ValVar(x) =>
           (env.findValueDecl(x, vlabel) match {
-            case None                                    => Left(ValueLabelNotFound(vlabel))
-            case Some(DeclVal(_, _))                     => Left(NotAFieldButAMethod(vlabel))
-            case Some(DeclDef(_, _, None))               => Left(MethodNotImplemented(vlabel))
-            case Some(DeclDef(params, ty, Some(astImp))) => Right((params, ty, astImp))
+            case None                                       => Left(ValueLabelNotFound(vlabel))
+            case Some(DeclVal(_, _, _))                     => Left(NotAFieldButAMethod(vlabel))
+            case Some(DeclDef(_, _, _, None))               => Left(MethodNotImplemented(vlabel))
+            case Some(DeclDef(_, params, ty, Some(astImp))) => Right((params, ty, astImp))
           }) flatMap { case (params, ty, astImp) =>
             val resInit : Either[EvalError, List[Value]] = Right(Nil);
             astargs.foldLeft(resInit){ case (res, astarg) =>
@@ -237,15 +237,15 @@ class FWSInterpreter {
     tyval match {
       case ValTypeSelection(x, tlabel) =>
         env.findTypeDecl(x, tlabel) match {
-          case None                 => Left(TypeLabelNotFound(tlabel))
-          case Some(DeclType(None)) => Left(TypeNotEmbodied(tlabel))
+          case None                    => Left(TypeLabelNotFound(tlabel))
+          case Some(DeclType(_, None)) => Left(TypeNotEmbodied(tlabel))
 
-          case Some(DeclType(Some(ty0))) =>
+          case Some(DeclType(_, Some(ty0))) =>
             interpretType(env, ty0) flatMap { tyval0 =>
               lookupDeclarations(env, tyval0, x)
             }
 
-          case Some(DeclTrait(tysig)) =>
+          case Some(DeclTrait(_, tysig)) =>
             interpretIntersection(env, tysig) flatMap { tyvalsig =>
               lookupDeclarations(env, ValTypeSignature(tyvalsig), x)
             }
