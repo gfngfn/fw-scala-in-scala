@@ -207,6 +207,7 @@ object FWSTypeChecker {
               if (store.contains(did)) {
                 Left(AlreadySeen(did))
               } else {
+              /* (\preccurly-TYPE) */
                 expandType(store.add(did), tyenv, x, tyT)
               }
 
@@ -214,6 +215,7 @@ object FWSTypeChecker {
               if (store.contains(did)) {
                 Left(AlreadySeen(did))
               } else {
+              /* (\preccurly-CLASS) */
                 val tysub : Type = TypeSignature(tysig)
                   /* TEMPORARY: should rename variables by using `phi` and `x` */
                 expandType(store.add(did), tyenv, x, tysub)
@@ -225,6 +227,7 @@ object FWSTypeChecker {
         Left(CannotExpandSingletonType(path))
 
       case TypeSignature(Intersection(tys, phi, decls)) =>
+      /* (\preccurly-SIGNATURE) */
         val init : Either[TypeError, MapPair] = Right(new EmptyMapPair())
         tys.foldLeft(init) { (acc, ty) =>
           acc flatMap { mapPairAcc =>
@@ -242,6 +245,7 @@ object FWSTypeChecker {
   def checkTypeWellFormedness(store : Store, tyenv :TypeEnv, ty : Type) : Either[TypeError, Unit] =
     ty match {
       case SingletonType(path) =>
+      /* (WF-SINGLETON) */
         typeCheckPath(store, tyenv, path) flatMap { tyT =>
           extendStoreByPath(store, tyenv, path) flatMap { store =>
             checkTypeWellFormedness(store, tyenv, tyT)
@@ -252,9 +256,11 @@ object FWSTypeChecker {
         typeMembership(store, tyenv, SingletonType(path), tlabel) flatMap { td =>
           td match {
             case DeclTrait(_, _) =>
+            /* (WF-CLASS) */
               Right(Unit)
 
             case DeclType(did, tyTopt) =>
+            /* (WF-TYPE) */
               tyTopt match {
                 case None =>
                   Right(Unit)
@@ -270,6 +276,7 @@ object FWSTypeChecker {
         }
 
       case TypeSignature(tysig) =>
+      /* (WF-SIGNATURE) */
         ???
     }
 
@@ -337,6 +344,7 @@ object FWSTypeChecker {
     val phi : String = generateFreshVariable();
     ty match {
       case SingletonType(pathP) =>
+      /* (\ni-SINGLETON) */
         expandPathAlias(store, tyenv, pathP) flatMap { case (pathQ, tyT) =>
           extendStoreByPath(store, tyenv, pathP) flatMap { store =>
             expandType(store, tyenv, phi, tyT)
@@ -344,6 +352,7 @@ object FWSTypeChecker {
         }
 
       case _ =>
+      /* (\ni-OTHER) */
         expandType(store, tyenv, phi, ty)
     }
   }
@@ -353,11 +362,13 @@ object FWSTypeChecker {
     typeCheckPath(store, tyenv, pathP) flatMap { ty =>
       ty match {
         case SingletonType(pathQ) =>
+        /* (\cong-STEP) */
           extendStoreByPath(store, tyenv, pathQ) flatMap { store =>
             expandPathAlias(store, tyenv, pathQ)
           }
 
         case _ =>
+        /* (\cong-REFL)*/
           Right((pathP, ty))
       }
     }
