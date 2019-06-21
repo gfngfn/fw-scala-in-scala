@@ -240,7 +240,38 @@ object FWSTypeChecker {
 
 
   def checkTypeWellFormedness(store : Store, tyenv :TypeEnv, ty : Type) : Either[TypeError, Unit] =
-    ???
+    ty match {
+      case SingletonType(path) =>
+        typeCheckPath(store, tyenv, path) flatMap { tyT =>
+          extendStoreByPath(store, tyenv, path) flatMap { store =>
+            checkTypeWellFormedness(store, tyenv, tyT)
+          }
+        }
+
+      case TypeSelection(path, tlabel) =>
+        typeMembership(store, tyenv, SingletonType(path), tlabel) flatMap { td =>
+          td match {
+            case DeclTrait(_, _) =>
+              Right(Unit)
+
+            case DeclType(did, tyTopt) =>
+              tyTopt match {
+                case None =>
+                  Right(Unit)
+
+                case Some(tyT) =>
+                  if (store.contains(did)) {
+                    Left(AlreadySeen(did))
+                  } else {
+                    checkTypeWellFormedness(store.add(did), tyenv, tyT)
+                  }
+              }
+          }
+        }
+
+      case TypeSignature(tysig) =>
+        ???
+    }
 
 
   def isSubtype(store : Store, tyenv : TypeEnv, ty1 : Type, ty2 : Type) : Either[TypeError, Unit] =
