@@ -8,6 +8,8 @@ case class UndefinedVariable(x : String)                   extends TypeError
 case class AlreadySeen(did : DeclarationID)                extends TypeError
 case class CannotExpandSingletonType(p : Path)             extends TypeError
 case class NonEmbodiedTypeLabel(tl : String)               extends TypeError
+case class ValueNotFound(vl : String)                      extends TypeError
+case class TypeNotFound(tl : String)                       extends TypeError
 
 
 trait Store {
@@ -283,21 +285,20 @@ object FWSTypeChecker {
 
 
   def valueMembership(store : Store, tyenv : TypeEnv, ty : Type, vlabel : String) : Either[TypeError, ValueDeclBody] =
-    members(store, tyenv, ty) flatMap { decls =>
-      ???
-        /* TEMPORARY; should find the declaration for `vlabel` in `decls`
-           and replace the occurrences of `phi` with `pathP`
-        */
+    members(store, tyenv, ty) flatMap { mapPair =>
+      mapPair.getValue(vlabel) match {
+        case None     => Left(ValueNotFound(vlabel))
+        case Some(vd) => Right(vd)
+      }
     }
 
 
   def typeMembership(store : Store, tyenv : TypeEnv, ty : Type, tlabel : String) : Either[TypeError, TypeDeclBody] =
-    members(store, tyenv, ty) flatMap { decls =>
-      ???
-        /* TEMPORARY; should find the declaration for `vlabel` in `decls`,
-           checks `phi` does not freely occurs in the declaration,
-           and then return the declaration.
-        */
+    members(store, tyenv, ty) flatMap { mapPair =>
+      mapPair.getType(tlabel) match {
+        case None     => Left(TypeNotFound(tlabel))
+        case Some(td) => Right(td)
+      }
     }
 
 
