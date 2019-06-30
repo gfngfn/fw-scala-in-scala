@@ -12,6 +12,7 @@ case class ValueNotFound(vl : String)                      extends TypeError
 case class TypeNotFound(tl : String)                       extends TypeError
 case class ShouldNotBeASingletonType()                     extends TypeError
 case class InvalidDefOverriding(vl : String)               extends TypeError
+case class InvalidTypeOverriding(vl : String)              extends TypeError
 
 
 trait Store {
@@ -377,7 +378,20 @@ object FWSTypeChecker {
 
 
   def isTypeMemberSubtype(store : Store, tyenv : TypeEnv, tlabel : String, td1 : TypeDeclBody, td2 : TypeDeclBody) : Either[TypeError, Unit] =
-    ???
+    (td1, td2) match {
+      case (DeclType(_, tyopt1), DeclType(_, tyopt2)) =>
+        (tyopt1, tyopt2) match {
+          case (Some(ty1), Some(ty2)) => ??? /* FIXME; should return whether `ty1` is equal to `ty2` */
+          case (Some(_), None)        => Right(())
+          case _                      => Left(InvalidTypeOverriding(tlabel))
+        }
+
+      case (DeclTrait(_, tysig1), DeclTrait(_, tysig2)) =>
+        ??? /* FIXME; should return whether `tysig1` is equal to `tysig2` */
+
+      case _ =>
+        Left(InvalidTypeOverriding(tlabel))
+    }
 
 
   def checkMemberWellFormednessSub(store : Store, tyenv : TypeEnv, decl : Declaration, x : String) : Either[TypeError, Unit] =
