@@ -27,6 +27,27 @@ trait MapPair {
       val tymap = mergeByRightHandSidePriority(tymap1, tymap2);
       new MapPair { val body = (valmap, tymap) }
     }
+
+
+  def foldValueIntersection[A](mapPair2 : MapPair, accInit : A, vf : (A, String, ValueDeclBody, ValueDeclBody) => A) : A =
+    (body, mapPair2.body) match { case ((valmap1, _), (valmap2, _)) =>
+      valmap1.foldLeft(accInit) { case (acc, (vlabel, vd1)) =>
+        valmap2.get(vlabel) match {
+          case None      => acc
+          case Some(vd2) => vf(acc, vlabel, vd1, vd2)
+        }
+      }
+    }
+
+  def foldTypeIntersection[A](mapPair2 : MapPair, accInit : A, tf : (A, String, TypeDeclBody, TypeDeclBody) => A) : A =
+    (body, mapPair2.body) match { case ((_, tymap1), (_, tymap2)) =>
+      tymap1.foldLeft(accInit) { case (acc, (tlabel, td1)) =>
+        tymap2.get(tlabel) match {
+          case None      => acc
+          case Some(td2) => tf(acc, tlabel, td1, td2)
+        }
+      }
+    }
 }
 
 class EmptyMapPair extends MapPair {

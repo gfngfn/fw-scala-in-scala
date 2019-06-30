@@ -11,6 +11,7 @@ case class NonEmbodiedTypeLabel(tl : String)               extends TypeError
 case class ValueNotFound(vl : String)                      extends TypeError
 case class TypeNotFound(tl : String)                       extends TypeError
 case class ShouldNotBeASingletonType()                     extends TypeError
+case class InvalidDefOverriding(vl : String)               extends TypeError
 
 
 trait Store {
@@ -287,26 +288,96 @@ object FWSTypeChecker {
   def checkMemberWellFormedness(store : Store, tyenv : TypeEnv, tysig : Intersection[Type], x : String) : Either[TypeError, Unit] =
     /* (WF-X-SIGNATURE) */
     /* FIXME; should perform alpha-renaming as to `x` and `phi` */
-    tysig match { case Intersection(tys, phi, decls) =>
+    tysig match { case Intersection(tyTs, phi, declsM) =>
       val resInit : Either[TypeError, Unit] = Right(())
-      decls.foldLeft(resInit) { case (res, decl) =>
+      declsM.foldLeft(resInit) { case (res, decl) =>
         res flatMap { _ =>
           checkMemberWellFormednessSub(store, tyenv, decl, phi)
         }
       } flatMap { _ =>
         val resInit : Either[TypeError, List[MapPair]] = Right(Nil)
-        tys.foldLeft(resInit) { case (res, ty) =>
+        tyTs.foldLeft(resInit) { case (res, tyT) =>
           res flatMap { acc =>
-            expandType(store, tyenv, phi, ty) flatMap { mapPair =>
-              Right(mapPair :: acc)
+            expandType(store, tyenv, phi, tyT) flatMap { mapPairN =>
+              Right(mapPairN :: acc)
             }
           }
-        } flatMap { (mapPairRev : List[MapPair]) =>
-          val mapPairs : List[MapPair] = mapPairRev.reverse
-          ???
+        } flatMap { (mapPairNRev : List[MapPair]) =>
+          val mapPairNs : List[MapPair] = mapPairNRev.reverse
+          val mapPairM : MapPair = new MapPairOfDeclarations(declsM)
+          def aux(mapPairNs : List[MapPair]) : Either[TypeError, Unit] = {
+            mapPairNs match {
+              case Nil =>
+                Right(())
+
+              case mapPairN :: rest =>
+                checkOverrideWellFormedness(store, tyenv, mapPairM, mapPairN, rest) flatMap { _ =>
+                  aux(rest)
+                }
+            }
+          }
+          aux(mapPairNs)
         }
       }
     }
+
+
+  def checkOverrideWellFormedness(store : Store, tyenv : TypeEnv, mapPairM : MapPair, mapPairNi : MapPair, rest : List[MapPair]) : Either[TypeError, Unit] = {
+    val resInit : Either[TypeError, Unit] = Right(())
+    rest.foldLeft(resInit) { case (res, mapPairNij) =>
+      res flatMap { _ =>
+        isPointwiseSubtype(store, tyenv, mapPairNij.concat(mapPairM), mapPairNi)
+      }
+    }
+  }
+
+
+  def isPointwiseSubtype(store : Store, tyenv : TypeEnv, mapPair1 : MapPair, mapPair2 : MapPair) : Either[TypeError, Unit] ={
+    /* \ll */
+    val resInit : Either[TypeError, Unit] = Right(())
+    mapPair1.foldValueIntersection[Either[TypeError, Unit]](mapPair2, resInit, { case (res, vlabel, vd1, vd2) =>
+      res flatMap { _ =>
+        isValueMemberSubtype(store, tyenv, vlabel, vd1, vd2)
+      }
+    }) flatMap { _ =>
+      mapPair1.foldTypeIntersection[Either[TypeError, Unit]](mapPair2, resInit, { case (res, tlabel, td1, td2) =>
+        res flatMap { _ =>
+          isTypeMemberSubtype(store, tyenv, tlabel, td1, td2)
+        }
+      })
+    }
+  }
+
+
+  def isValueMemberSubtype(store : Store, tyenv : TypeEnv, vlabel : String, vd1 : ValueDeclBody, vd2 : ValueDeclBody) : Either[TypeError, Unit] =
+    (vd1, vd2) match {
+      case (DeclVal(_, ty1, _), DeclVal(_, ty2, _)) =>
+      /* (<:-MEMBER-FIELD) */
+        isSubtype(store, tyenv, ty1, ty2)
+
+      case (DeclDef(_, params1, tyans1, _), DeclDef(_, params2, tyans2, _)) =>
+      /* (<:-MEMBER-METHOD) */
+        if (params1.length != params2.length) {
+          Left(InvalidDefOverriding(vlabel))
+        } else {
+          val pairs : List[((String, Type), (String, Type))] = params1.zip(params2)
+          val resInit : Either[TypeError, Unit] = Right(())
+          pairs.foldLeft(resInit) { case (res, ((_, ty1), (_, ty2))) =>
+            isSubtype(store, tyenv, ty2, ty1)
+              /* contravariant as to parameters */
+          } flatMap { _ =>
+            isSubtype(store, tyenv, tyans1, tyans2)
+              /* covariant as to returned types */
+          }
+        }
+
+      case _ =>
+        Left(InvalidDefOverriding(vlabel))
+    }
+
+
+  def isTypeMemberSubtype(store : Store, tyenv : TypeEnv, tlabel : String, td1 : TypeDeclBody, td2 : TypeDeclBody) : Either[TypeError, Unit] =
+    ???
 
 
   def checkMemberWellFormednessSub(store : Store, tyenv : TypeEnv, decl : Declaration, x : String) : Either[TypeError, Unit] =
