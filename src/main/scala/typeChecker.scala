@@ -10,6 +10,7 @@ case class CannotExpandSingletonType(p : Path)             extends TypeError
 case class NonEmbodiedTypeLabel(tl : String)               extends TypeError
 case class ValueNotFound(vl : String)                      extends TypeError
 case class TypeNotFound(tl : String)                       extends TypeError
+case class ShouldNotBeASingletonType()                     extends TypeError
 
 
 trait Store {
@@ -277,7 +278,102 @@ object FWSTypeChecker {
 
       case TypeSignature(tysig) =>
       /* (WF-SIGNATURE) */
-        ???
+        tysig match { case Intersection(_, phi, _) =>
+          checkMemberWellFormedness(store, tyenv.add(phi, ty), tysig, phi)
+        }
+    }
+
+
+  def checkMemberWellFormedness(store : Store, tyenv : TypeEnv, tysig : Intersection[Type], x : String) : Either[TypeError, Unit] =
+    /* (WF-X-SIGNATURE) */
+    /* FIXME; should perform alpha-renaming as to `x` and `phi` */
+    tysig match { case Intersection(tys, phi, decls) =>
+      val resInit : Either[TypeError, Unit] = Right(())
+      decls.foldLeft(resInit) { case (res, decl) =>
+        res flatMap { _ =>
+          checkMemberWellFormednessSub(store, tyenv, decl, phi)
+        }
+      } flatMap { _ =>
+        val resInit : Either[TypeError, List[MapPair]] = Right(Nil)
+        tys.foldLeft(resInit) { case (res, ty) =>
+          res flatMap { acc =>
+            expandType(store, tyenv, phi, ty) flatMap { mapPair =>
+              Right(mapPair :: acc)
+            }
+          }
+        } flatMap { (mapPairRev : List[MapPair]) =>
+          val mapPairs : List[MapPair] = mapPairRev.reverse
+          ???
+        }
+      }
+    }
+
+
+  def checkMemberWellFormednessSub(store : Store, tyenv : TypeEnv, decl : Declaration, x : String) : Either[TypeError, Unit] =
+    decl match {
+      case DeclForTypeLabel(tlabel, td) =>
+        td match {
+          case DeclType(_, tyopt) =>
+          /* (WF-X-TYPE) */
+            tyopt match {
+              case None     => Right(())
+              case Some(ty) => checkTypeWellFormedness(store, tyenv, ty)
+            }
+
+          case DeclTrait(_, tysig) =>
+          /* (WF-X-CLASS) */
+            tysig match { case Intersection(_, phi, _) =>
+              val tyenvsub : TypeEnv = tyenv.add(phi, TypeSelection(Path(x, Nil), tlabel))
+              checkMemberWellFormedness(store, tyenvsub, tysig, phi)
+            }
+        }
+
+      case DeclForValueLabel(vlabel, vd) =>
+        vd match {
+          case DeclVal(_, tyT, astopt) =>
+          /* (WF-X_FIELD) */
+            checkTypeWellFormedness(store, tyenv, tyT) flatMap { _ =>
+              astopt match {
+                case None =>
+                  Right(())
+
+                case Some(ast) =>
+                  typeCheck(store, tyenv, ast) flatMap { tyTprime =>
+                    isSubtype(store, tyenv, tyTprime, tyT)
+                  }
+              }
+            }
+
+          case DeclDef(_, params, tyT, astopt) =>
+          /* (WF-X_METHOD) */
+            checkTypeWellFormedness(store, tyenv, tyT) flatMap { _ =>
+              val resInit : Either[TypeError, TypeEnv] = Right(tyenv)
+              params.foldLeft(resInit) { case (res, (y, tyS)) =>
+                res flatMap { tyenv =>
+                  tyS match {
+                    case SingletonType(_) =>
+                      Left(ShouldNotBeASingletonType())
+
+                    case _ =>
+                      checkTypeWellFormedness(store, tyenv, tyS) flatMap { _ =>
+                        Right(tyenv.add(y, tyS))
+                      }
+                  }
+                }
+              } flatMap { tyenvsub =>
+                astopt match {
+                  case None =>
+                    Right(())
+
+                  case Some(ast) =>
+                    typeCheck(store, tyenvsub, ast) flatMap { tyTprime =>
+                      isSubtype(store, tyenv, tyTprime, tyT)
+                        /* note: not `tyenvsub` but `tyenv` */
+                    }
+                }
+              }
+            }
+        }
     }
 
 
@@ -368,7 +464,7 @@ object FWSTypeChecker {
           }
 
         case _ =>
-        /* (\cong-REFL)*/
+        /* (\cong-REFL) */
           Right((pathP, ty))
       }
     }
