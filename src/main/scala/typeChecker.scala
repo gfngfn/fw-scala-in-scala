@@ -334,7 +334,7 @@ object FWSTypeChecker {
 
 
   def isPointwiseSubtype(store : Store, tyenv : TypeEnv, mapPair1 : MapPair, mapPair2 : MapPair) : Either[TypeError, Unit] ={
-    /* \ll */
+    /* store, tyenv \vdash mapPair1 \ll mapPair2 [p. 16] */
     val resInit : Either[TypeError, Unit] = Right(())
     mapPair1.foldValueIntersection[Either[TypeError, Unit]](mapPair2, resInit, { case (res, vlabel, vd1, vd2) =>
       res flatMap { _ =>
@@ -380,19 +380,26 @@ object FWSTypeChecker {
   def isTypeMemberSubtype(store : Store, tyenv : TypeEnv, tlabel : String, td1 : TypeDeclBody, td2 : TypeDeclBody) : Either[TypeError, Unit] =
     (td1, td2) match {
       case (DeclType(_, tyopt1), DeclType(_, tyopt2)) =>
+      /* (<:-MEMBER-TYPE) */
         (tyopt1, tyopt2) match {
-          case (Some(ty1), Some(ty2)) => ??? /* FIXME; should return whether `ty1` is equal to `ty2` */
+          case (Some(ty1), Some(ty2)) => equalAsType(store, tyenv, ty1, ty2)
           case (Some(_), None)        => Right(())
           case _                      => Left(InvalidTypeOverriding(tlabel))
         }
 
       case (DeclTrait(_, tysig1), DeclTrait(_, tysig2)) =>
-        ??? /* FIXME; should return whether `tysig1` is equal to `tysig2` */
+      /* (<:-MEMBER-CLASS) */
+        equalAsIntersection(store, tyenv, tysig1, tysig2)
 
       case _ =>
         Left(InvalidTypeOverriding(tlabel))
     }
 
+  def equalAsType(store : Store, tyenv : TypeEnv, ty1 : Type, ty2 : Type) : Either[TypeError, Unit] =
+    ??? /* FIXME; should return whether `ty1` is equal to `ty2` */
+
+  def equalAsIntersection(store : Store, tyenv : TypeEnv, tysig1 : Intersection[Type], tysig2 : Intersection[Type]) : Either[TypeError, Unit] =
+    ??? /* FIXME; should return whether `tysig1` is equal to `tysig2` */
 
   def checkMemberWellFormednessSub(store : Store, tyenv : TypeEnv, decl : Declaration, x : String) : Either[TypeError, Unit] =
     decl match {
