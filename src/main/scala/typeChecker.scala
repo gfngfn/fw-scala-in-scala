@@ -13,6 +13,7 @@ case class TypeNotFound(tl : String)                       extends TypeError
 case class ShouldNotBeASingletonType()                     extends TypeError
 case class InvalidDefOverriding(vl : String)               extends TypeError
 case class InvalidTypeOverriding(vl : String)              extends TypeError
+case class NotEqualTypeSyntax()                            extends TypeError
 
 
 trait Store {
@@ -396,7 +397,19 @@ object FWSTypeChecker {
     }
 
   def equalAsType(store : Store, tyenv : TypeEnv, ty1 : Type, ty2 : Type) : Either[TypeError, Unit] =
-    ??? /* FIXME; should return whether `ty1` is equal to `ty2` */
+    (ty1, ty2) match {
+      case (TypeSelection(p1, tl1), TypeSelection(p2, tl2)) =>
+        if (p1 == p2 && tl1 == tl2) { Right(()) } else { Left(NotEqualTypeSyntax()) }
+
+      case (SingletonType(p1), SingletonType(p2)) =>
+        if (p1 == p2) { Right(()) } else { Left(NotEqualTypeSyntax()) }
+
+      case (TypeSignature(tysig1), TypeSignature(tysig2)) =>
+        equalAsIntersection(store, tyenv, tysig1, tysig2)
+
+      case _ =>
+        Left(NotEqualTypeSyntax())
+    }
 
   def equalAsIntersection(store : Store, tyenv : TypeEnv, tysig1 : Intersection[Type], tysig2 : Intersection[Type]) : Either[TypeError, Unit] =
     ??? /* FIXME; should return whether `tysig1` is equal to `tysig2` */
