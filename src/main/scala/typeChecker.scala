@@ -504,9 +504,11 @@ object FWSTypeChecker {
     /* store, tyenv \vdash ty \cong ty' */
     ty match {
       case TypeSignature(_) =>
+      /* (\cong-SIGNATURE) */
         Right(ty)
 
       case SingletonType(_) =>
+      /* (\cong-SINGLETON) */
         Right(ty)
 
       case TypeSelection(p, tlabel) =>
@@ -516,12 +518,15 @@ object FWSTypeChecker {
               Left(TypeNotFound(tlabel))
 
             case Some(DeclTrait(_, _)) =>
+            /* (\cong-CLASS) */
               Right(ty)
 
             case Some(DeclType(_, None)) =>
+            /* (\cong-ABSTYPE) */
               Right(ty)
 
             case Some(DeclType(did, Some(ty1))) =>
+            /* (\cong-TYPE) */
               if (store.contains(did)) {
                 Left(AlreadySeen(did))
               } else {
@@ -535,7 +540,26 @@ object FWSTypeChecker {
 
   def isSubtypeCore(store : Store, tyenv : TypeEnv, ty1p : Type, ty2p : Type) : Either[TypeError, Unit] =
     /* store, tyenv, \vdash_* ty1p <: ty2p */
-    ??? /* FIXME */
+    (ty1p, ty2p) match {
+      case (SingletonType(p1), SingletonType(p2)) =>
+      /* (<:-SINGLETON_RIGHT) */
+        expandPathAlias(store, tyenv, p1) flatMap { case (q1, _) =>
+          expandPathAlias(store, tyenv, p2) flatMap { case (q2, _) =>
+            if (q1 == q2) { Right(()) } else { Left(NotEqualTypeSyntax()) /* FIXME */ }
+          }
+        }
+
+      case (SingletonType(p1), _) =>
+      /* (<:-SINGLETON_LEFT) */
+        expandPathAlias(store, tyenv, p1) flatMap { case (q1, _) =>
+          typeCheckPath(store, tyenv, q1) flatMap { ty1 =>
+            isSubtype(store, tyenv, ty1, ty2p)
+          }
+        }
+
+      case _ =>
+        ???
+    }
 
   def pathOfAstIfPossible(ast : Ast) : Option[Path] = {
     def aux(vlabelacc : List[String], ast : Ast) : Option[Path] = {
