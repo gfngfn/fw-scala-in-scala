@@ -502,7 +502,36 @@ object FWSTypeChecker {
 
   def expandTypeAlias(store : Store, tyenv : TypeEnv, ty : Type) : Either[TypeError, Type] =
     /* store, tyenv \vdash ty \cong ty' */
-    ??? /* FIXME */
+    ty match {
+      case TypeSignature(_) =>
+        Right(ty)
+
+      case SingletonType(_) =>
+        Right(ty)
+
+      case TypeSelection(p, tlabel) =>
+        members(store, tyenv, SingletonType(p)) flatMap { mapPair =>
+          mapPair.getType(tlabel) match {
+            case None =>
+              Left(TypeNotFound(tlabel))
+
+            case Some(DeclTrait(_, _)) =>
+              Right(ty)
+
+            case Some(DeclType(_, None)) =>
+              Right(ty)
+
+            case Some(DeclType(did, Some(ty1))) =>
+              if (store.contains(did)) {
+                Left(AlreadySeen(did))
+              } else {
+                expandTypeAlias(store.add(did), tyenv, ty1) flatMap { ty2 =>
+                  Right(ty2)
+                }
+              }
+          }
+        }
+    }
 
   def isSubtypeCore(store : Store, tyenv : TypeEnv, ty1p : Type, ty2p : Type) : Either[TypeError, Unit] =
     /* store, tyenv, \vdash_* ty1p <: ty2p */
