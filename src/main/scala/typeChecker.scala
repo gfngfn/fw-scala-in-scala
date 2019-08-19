@@ -412,7 +412,16 @@ object FWSTypeChecker {
     }
 
   def equalAsIntersection(store : Store, tyenv : TypeEnv, tysig1 : Intersection[Type], tysig2 : Intersection[Type]) : Either[TypeError, Unit] =
-    ??? /* FIXME; should return whether `tysig1` is equal to `tysig2` */
+    (tysig1, tysig2) match {
+      case (Intersection(tys1, phi1, decls1), Intersection(tys2, phi2, decls2)) =>
+        if (tys1 == tys2 && phi1 == phi2 && decls1 == decls2) {
+          Right(())
+        } else {
+          Left(NotEqualTypeSyntax())
+        }
+        /* FIXME; should return whether `tysig1` is equal to `tysig2`
+           up to alpha-conversion */
+    }
 
   def checkMemberWellFormednessSub(store : Store, tyenv : TypeEnv, decl : Declaration, x : String) : Either[TypeError, Unit] =
     decl match {
@@ -483,8 +492,21 @@ object FWSTypeChecker {
 
 
   def isSubtype(store : Store, tyenv : TypeEnv, ty1 : Type, ty2 : Type) : Either[TypeError, Unit] =
-    ???
+    /* store, tyenv \vdash ty1 <: ty2 */
+    expandTypeAlias(store, tyenv, ty1) flatMap { ty1p =>
+      expandTypeAlias(store, tyenv, ty2) flatMap { ty2p =>
+        isSubtypeCore(store, tyenv, ty1p, ty2p)
 
+      }
+    }
+
+  def expandTypeAlias(store : Store, tyenv : TypeEnv, ty : Type) : Either[TypeError, Type] =
+    /* store, tyenv \vdash ty \cong ty' */
+    ??? /* FIXME */
+
+  def isSubtypeCore(store : Store, tyenv : TypeEnv, ty1p : Type, ty2p : Type) : Either[TypeError, Unit] =
+    /* store, tyenv, \vdash_* ty1p <: ty2p */
+    ??? /* FIXME */
 
   def pathOfAstIfPossible(ast : Ast) : Option[Path] = {
     def aux(vlabelacc : List[String], ast : Ast) : Option[Path] = {
