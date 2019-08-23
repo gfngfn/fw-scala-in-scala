@@ -48,6 +48,9 @@ trait MapPair {
         }
       }
     }
+
+  def includesAsToDomain(mapPair2 : MapPair) : Boolean =
+    ???
 }
 
 class EmptyMapPair extends MapPair {

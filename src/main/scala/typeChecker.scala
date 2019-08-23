@@ -14,6 +14,8 @@ case class ShouldNotBeASingletonType()                     extends TypeError
 case class InvalidDefOverriding(vl : String)               extends TypeError
 case class InvalidTypeOverriding(vl : String)              extends TypeError
 case class NotEqualTypeSyntax()                            extends TypeError
+case class DomainNotIncluded()                             extends TypeError
+case class NotASubtype()                                   extends TypeError
 
 
 trait Store {
@@ -592,8 +594,37 @@ object FWSTypeChecker {
           }
         }
 
+      case (TypeSignature(Intersection(tys, _, _)), TypeSelection(_, _)) =>
+      /* (<:-SIG-LEFT) */
+        val resInit : Either[TypeError, Unit] = Right(())
+        tys.foldLeft(resInit) { case (res, ty) =>
+          res flatMap { case _ =>
+            isSubtype(store, tyenv, ty, ty2p)
+          }
+        }
+
+      case (_, TypeSignature(Intersection(tys, phi, decls))) =>
+      /* (<:-SIG-RIGHT) */
+        val mapPairM = new MapPairOfDeclarations(decls)
+        val resInit : Either[TypeError, Unit] = Right(())
+        val res1 : Either[TypeError, Unit] =
+          tys.foldLeft(resInit) { case (res, ty) =>
+            res flatMap { case _ =>
+              isSubtype(store, tyenv, ty1p, ty)
+            }
+          }
+        res1 flatMap { case _ =>
+          expandType(store, tyenv, phi, ty1p) flatMap { case mapPairN =>
+            if (!mapPairN.includesAsToDomain(mapPairM)) {
+              Left(DomainNotIncluded())
+            } else {
+              isPointwiseSubtype(store, tyenv, mapPairN, mapPairM)
+            }
+          }
+        }
+
       case _ =>
-        ???
+        Left(NotASubtype())
 
     }
 
