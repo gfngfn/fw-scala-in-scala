@@ -557,8 +557,44 @@ object FWSTypeChecker {
           }
         }
 
+      case (TypeSelection(p1, tlabel1), TypeSelection(p2, tlabel2)) =>
+        if (tlabel1 == tlabel2) {
+        /* (<:-PATHS) */
+          expandPathAlias(store, tyenv, p1) flatMap { p1p =>
+            expandPathAlias(store, tyenv, p2) flatMap { p2p =>
+              if (p1p == p2p) {
+                Right(())
+              } else {
+                Left(NotEqualTypeSyntax()) /* FIXME */
+              }
+            }
+          }
+        } else {
+        /* (<:-CLASS) */
+          typeMembership(store, tyenv, SingletonType(p1), tlabel1) flatMap { td =>
+            td match {
+              case DeclTrait(did, Intersection(tys, _, _)) =>
+                if (store.contains(did)) {
+                  Left(AlreadySeen(did))
+                } else {
+                  val storeIter : Store = store.add(did)
+                  val resInit : Either[TypeError, Unit] = Right(())
+                  tys.foldLeft(resInit) { case (res, ty) =>
+                    res flatMap { case _ =>
+                      isSubtype(storeIter, tyenv, ty, ty2p)
+                    }
+                  }
+                }
+
+              case _ =>
+                Left(NotEqualTypeSyntax()) /* FIXME */
+            }
+          }
+        }
+
       case _ =>
         ???
+
     }
 
   def pathOfAstIfPossible(ast : Ast) : Option[Path] = {
