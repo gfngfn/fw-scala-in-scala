@@ -50,7 +50,17 @@ trait MapPair {
     }
 
   def includesAsToDomain(mapPair2 : MapPair) : Boolean =
-    ???
+    (body, mapPair2.body) match { case ((valmap1, tymap1), (valmap2, tymap2)) =>
+      val bValue : Boolean =
+        valmap2.foldLeft(true) { case (b, (vlabel, _)) =>
+          b && valmap1.contains(vlabel)
+        }
+      val bType : Boolean =
+        tymap2.foldLeft(true) { case (b, (tlabel, _)) =>
+          b && tymap1.contains(tlabel)
+        }
+      bValue && bType
+    }
 }
 
 class EmptyMapPair extends MapPair {
