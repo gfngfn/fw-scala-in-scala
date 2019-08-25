@@ -70,7 +70,7 @@ case class DeclForTypeLabel(tl : String, td : TypeDeclBody)   extends Declaratio
 
 object FWSParser extends JavaTokenParsers {
 
-  val reservedWord = List("val", "def", "new", "type", "trait")
+  val reservedWord = List("val", "def", "new", "type", "trait", "extends")
 
   def variable : Parser[String] =
     ident ^? {
@@ -91,13 +91,18 @@ object FWSParser extends JavaTokenParsers {
     ( "val" ~> ((variable <~ "=") <~ "new") ~ (typ <~ ";") ~ expr ^^ {
         case x ~ ty ~ e => ValNewIn(x, ty, e)
       }
-    | exprChain
+      | exprChain
+    )
+
+  def exprSingle : Parser[Ast] =
+    ( "(" ~> expr <~ ")"
+    | variable ^^ { case x => Var(x) }
     )
 
   def exprChain : Parser[Ast] =
-    variable ~ rep("." ~> valueLabel ~ opt(args)) ^^ {
-      case x ~ lst =>
-        val init : Ast = Var(x);
+    exprSingle ~ rep("." ~> valueLabel ~ opt(args)) ^^ {
+      case e0 ~ lst =>
+        val init : Ast = e0;
         lst.foldLeft(init)((eacc, pair) =>
           pair match {
             case vl ~ None     => Access(eacc, vl)
@@ -160,7 +165,7 @@ object FWSParser extends JavaTokenParsers {
           val did = DeclarationID()
           DeclForTypeLabel(tl, DeclType(did, tyopt))
       }
-    | "trait" ~> typeLabel ~ typeSignature ^^ {
+    | "trait" ~> typeLabel ~ ("extends" ~> typeSignature) ^^ {
         case tl ~ tysig =>
           val did = DeclarationID()
           DeclForTypeLabel(tl, DeclTrait(did, tysig))
