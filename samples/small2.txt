@@ -1,0 +1,1 @@
+val x = new (){this| def a() : (){this|} }; x.a()

@@ -1,0 +1,24 @@
+val universe = new (){ global |
+
+  type Boolean
+  val false: global.Boolean
+  val true: global.Boolean
+
+  trait Any extends () { this0 | }
+
+  trait Nat extends (global.Any) { this0 |
+    def isZero(): global.Boolean
+    def pred(): global.Nat
+    trait Succ extends (global.Nat) { this1 |
+      def isZero(): global.Boolean = global.false
+      def pred(): global.Nat = this0
+    }
+    def succ(): global.Nat = (val res = new this0.Succ; res)
+  }
+
+};
+val zero = new (universe.Nat) { this0 |
+  def isZero(): universe.Boolean = universe.true
+  def pred(): universe.Nat = this0
+};
+zero

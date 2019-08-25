@@ -1,0 +1,1 @@
+val x = new (){this| val a : (){this|} }; x.a
