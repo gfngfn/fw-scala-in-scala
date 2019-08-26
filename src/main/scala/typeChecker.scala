@@ -81,8 +81,9 @@ object FWSTypeChecker {
             }
 
           case Some(path) =>
-            val _ = typeCheckPath(store, tyenv, path);
-            Right(SingletonType(path))
+            typeCheckPath(store, tyenv, path) flatMap { _ =>
+              Right(SingletonType(path))
+            }
         }
 
       case Call(ast0, vlabel, astargs) =>
@@ -92,7 +93,7 @@ object FWSTypeChecker {
               Left(TypeNotAMethodButAField(vlabel))
 
             case DeclDef(_, params, tyans, _) =>
-              typeCheckParams(store, tyenv, params, astargs) flatMap { _ =>
+              typeCheckArgs(store, tyenv, params, astargs) flatMap { _ =>
                 Right(tyans)
               }
           }
@@ -122,7 +123,7 @@ object FWSTypeChecker {
     }
 
 
-  def typeCheckParams(store : Store, tyenv : TypeEnv, params : List[(String, Type)], astargs : List[Ast]) : Either[TypeError, Unit] = {
+  def typeCheckArgs(store : Store, tyenv : TypeEnv, params : List[(String, Type)], astargs : List[Ast]) : Either[TypeError, Unit] = {
     val lenArgs : Int = astargs.length;
     val lenParams : Int = params.length;
     if (lenArgs != lenParams) {
@@ -447,7 +448,7 @@ object FWSTypeChecker {
       case DeclForValueLabel(vlabel, vd) =>
         vd match {
           case DeclVal(_, tyT, astopt) =>
-          /* (WF-X_FIELD) */
+          /* (WF-X-FIELD) */
             checkTypeWellFormedness(store, tyenv, tyT) flatMap { _ =>
               astopt match {
                 case None =>
@@ -461,30 +462,30 @@ object FWSTypeChecker {
             }
 
           case DeclDef(_, params, tyT, astopt) =>
-          /* (WF-X_METHOD) */
+          /* (WF-X-METHOD) */
             checkTypeWellFormedness(store, tyenv, tyT) flatMap { _ =>
               val resInit : Either[TypeError, TypeEnv] = Right(tyenv)
               params.foldLeft(resInit) { case (res, (y, tyS)) =>
-                res flatMap { tyenv =>
+                res flatMap { tyenvAcc =>
                   tyS match {
                     case SingletonType(_) =>
                       Left(ShouldNotBeASingletonType())
 
                     case _ =>
-                      checkTypeWellFormedness(store, tyenv, tyS) flatMap { _ =>
-                        Right(tyenv.add(y, tyS))
+                      checkTypeWellFormedness(store, tyenvAcc, tyS) flatMap { _ =>
+                        Right(tyenvAcc.add(y, tyS))
                       }
                   }
                 }
-              } flatMap { tyenvsub =>
+              } flatMap { tyenvSub =>
                 astopt match {
                   case None =>
                     Right(())
 
                   case Some(ast) =>
-                    typeCheck(store, tyenvsub, ast) flatMap { tyTprime =>
-                      isSubtype(store, tyenv, tyTprime, tyT)
-                        /* note: not `tyenvsub` but `tyenv` */
+                    typeCheck(store, tyenvSub, ast) flatMap { tyTprime =>
+                      isSubtype(store, tyenvSub, tyTprime, tyT)
+                        /* note: not `tyenv` but `tyenvSub` */
                     }
                 }
               }
