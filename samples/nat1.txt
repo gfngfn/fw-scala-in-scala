@@ -13,7 +13,8 @@ val universe = new (){ global |
       def isZero(): global.Boolean = global.false
       def pred(): global.Nat = this0
     }
-    def succ(): global.Nat = (val res = new this0.Succ; res)
+    def idSucc(s: this0.Succ): this0.Succ = s
+    def succ(): global.Nat = (val res = new this0.Succ; this0.idSucc(res))
   }
 
 };
